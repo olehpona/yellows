@@ -1,6 +1,5 @@
 package org.example.executor;
 
-import org.example.context.InputContext;
 import org.example.context.OutputContext;
 import org.example.context.PathNode;
 import org.example.context.PathUtils;
@@ -28,18 +27,54 @@ public class RunContext {
         this.inDegrees = inDegrees;
     }
 
-    public InputContext buildInputContext() {
-        //todo
+    public JsonNode buildInputContext(Node node) {
+        ObjectNode input = JsonNodeFactory.instance.objectNode();
+        Map<String, JsonNode> toPut = new HashMap<>();
+
+        lock.lock();
+        try {
+            for (Map.Entry<String, String> el: node.output().entrySet()) {
+                toPut.put(el.getValue(), extractValueByPath(PathUtils.splitPath(el.getValue())));
+            }
+        } finally {
+            lock.unlock();
+        }
+
+        List<PathData> data = new ArrayList<>();
+
+        for (Map.Entry<String, String> el: node.output().entrySet()) {
+            data.add(new PathData(PathUtils.splitPath(el.getValue()), toPut.get(el.getValue())));
+        }
+        mergeContext(input, data);
+
+        return input;
     }
 
-    record PathData(List<PathNode> pathNodes, JsonNode value);
+    record PathData(List<PathNode> pathNodes, JsonNode value){};
+
+    private JsonNode extractValueByPath(List<PathNode> pathNodes) {
+        JsonNode current = this.root;
+
+        for (PathNode pathNode : pathNodes) {
+            if (current.isMissingNode() || current.isNull()) {
+                return current;
+            }
+
+            if (pathNode.isKey()) {
+                current = current.path(pathNode.getKey());
+            } else if (pathNode.isIndex()) {
+                current = current.path(pathNode.getIndex());
+            }
+        }
+        return current;
+    }
 
     public List<String> completeNode(Node node, OutputContext ctx) {
         List<String> nextNodes = new ArrayList<>();
-        if (ctx.getRouterHint().isEmpty()){
+        if (ctx.nextHint().isEmpty()){
             nextNodes.addAll(node.next());
         } else {
-            for (String nextHint: ctx.getRouterHint()) {
+            for (String nextHint: ctx.nextHint()) {
                 if (!node.next().contains(nextHint)) {
                     throw new ExecutorException(ExecutorExceptionCode.ERR_ILLEGAL_TRANSITION, String.format("Illegal transaction from %s to %s", node.name(), nextHint));
                 }
@@ -51,10 +86,10 @@ public class RunContext {
         List<String> toSpawn = new ArrayList<>();
         List<PathData> toMerge = new ArrayList<>();
 
-        ctx.getChanges().forEach((key, value) -> toMerge.add(new PathData(PathUtils.splitPath(key), mapper.valueToTree(value))));
+        ctx.changes().forEach((key, value) -> toMerge.add(new PathData(PathUtils.splitPath(key), mapper.valueToTree(value))));
 
         try {
-            mergeContext(toMerge);
+            mergeContext(this.root, toMerge);
             for (String nextNode: nextNodes) {
                 int currentDegree = inDegrees.get(nextNode);
                 int newDegree = currentDegree-1;
@@ -70,10 +105,10 @@ public class RunContext {
         return toSpawn.stream().toList();
     }
 
-    private void mergeContext(List<PathData> toMerge) {
+    private static void mergeContext(JsonNode root, List<PathData> toMerge) {
         for (PathData data: toMerge) {
             List<PathNode> nodes = data.pathNodes();
-            JsonNode current = this.root;
+            JsonNode current = root;
 
             for (int i = 0; i < nodes.size(); i++) {
                 PathNode currentPath = nodes.get(i);
@@ -89,9 +124,8 @@ public class RunContext {
         } ;
     }
 
-    private JsonNode getOrCreateChildNode(JsonNode parent, PathNode currentPath, PathNode nextPath) {
+    private static JsonNode getOrCreateChildNode(JsonNode parent, PathNode currentPath, PathNode nextPath) {
         if (parent.isObject()) {
-
             if (!currentPath.isKey()) {
                 throw new ExecutorException(ExecutorExceptionCode.ERR_CTX_MERGE_CONFLICT, "Adding index into object");
             }
@@ -134,7 +168,7 @@ public class RunContext {
         throw new ExecutorException(ExecutorExceptionCode.ERR_CTX_MERGE_CONFLICT, "Path is not an object or array");
     }
 
-    private void putFinalValue(JsonNode parent, PathNode currentPath, JsonNode tree) {
+    private static void putFinalValue(JsonNode parent, PathNode currentPath, JsonNode tree) {
         if (parent.isObject()) {
             ((ObjectNode) parent).set(currentPath.getKey(), tree);
         } else if (parent.isArray()) {

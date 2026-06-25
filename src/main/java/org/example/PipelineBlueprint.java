@@ -12,17 +12,17 @@ public class PipelineBlueprint {
         this.graph = graph;
     }
 
-    public Node getNode(String name) {
-        if (name == null || !graph.nodes().containsKey(name)) {
-            throw new RuntimeException("Unknown node");
-        }
-        return graph.nodes().get(name);
-    }
-
-    public Map<String, Integer> getInDegreeCopy(String root) {
-        if (root == null || !graph.inDegree().containsKey(root)) {
-            throw new RuntimeException("Unknown root");
-        }
-        return Map.copyOf(graph.inDegree().get(root));
-    }
+//    public Node getNode(String name) {
+//        if (name == null || !graph.nodes().containsKey(name)) {
+//            throw new RuntimeException("Unknown node");
+//        }
+//        return graph.nodes().get(name);
+//    }
+//
+//    public Map<String, Integer> getInDegreeCopy(String root) {
+//        if (root == null || !graph.inDegree().containsKey(root)) {
+//            throw new RuntimeException("Unknown root");
+//        }
+//        return Map.copyOf(graph.inDegree().get(root));
+//    }
 }

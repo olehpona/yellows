@@ -1,20 +1,24 @@
 package org.example.graph;
 
-import java.util.Arrays;
-import java.util.List;
-
 public final class KeyPath {
-    private final List<String> segments;
+    private final int[] segments;
 
-    private KeyPath(List<String> segments) {
-        this.segments = List.copyOf(segments);
+    private KeyPath(int[] segments) {
+        this.segments = segments;
     }
 
-    public static KeyPath fromString(String dotted) {
-        return new KeyPath(Arrays.asList(dotted.split("\\.")));
+    public static KeyPath fromString(String dotted, SymbolTable dict) {
+        String[] parts = dotted.split("\\.");
+        int[] segments = new int[parts.length];
+
+        for (int i = 0; i < parts.length; i++) {
+            segments[i] = dict.register(parts[i]);
+        }
+
+        return new KeyPath(segments);
     }
 
-    public List<String> segments() {
+    public int[] segments() {
         return segments;
     }
 }

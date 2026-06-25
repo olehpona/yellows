@@ -1,7 +1,7 @@
 package org.example.graph;
 
 public class TrieNode {
-    public String author;
+    public int author;
     public final ChildrenContainer children;
     public boolean isExplicit;
     public final int contextId;
@@ -10,7 +10,7 @@ public class TrieNode {
     public boolean hasWriteDeeper = false;
     public boolean hasReadDeeper = false;
 
-    public TrieNode(int contextId, String author) {
+    public TrieNode(int contextId, int author) {
         this.author = author;
         this.contextId = contextId;
         this.children = new ChildrenContainer();

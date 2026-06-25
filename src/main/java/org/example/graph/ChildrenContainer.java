@@ -1,85 +1,108 @@
 package org.example.graph;
 
-import java.util.*;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+
+import java.util.Arrays;
 
 public class ChildrenContainer {
-    private static final int LIST_THRESHOLD = 8;
+    private static final int THRESHOLD = 8;
 
-    private List<Entry> list;
-    private Map<String, TrieNode> map;
+    // Стан 1: Паралельні масиви (для малих вузлів)
+    private int[] keys;
+    private TrieNode[] values;
+    private int size;
 
-    private record Entry(String key, TrieNode node) {}
+    // Стан 2: Хеш-мапа (для великих вузлів)
+    private Int2ObjectOpenHashMap<TrieNode> map;
 
     public ChildrenContainer() {
-        this.list = new ArrayList<>();
+        this.keys = new int[THRESHOLD];
+        this.values = new TrieNode[THRESHOLD];
+        this.size = 0;
         this.map = null;
     }
 
+    // Конструктор копіювання (COW)
     public ChildrenContainer(ChildrenContainer other) {
-        if (other.list != null) {
-            this.list = new ArrayList<>(other.list);
+        if (other.map != null) {
+            // fastutil має вбудований швидкий конструктор копіювання
+            this.map = new Int2ObjectOpenHashMap<>(other.map);
+            this.keys = null;
+            this.values = null;
+        } else {
+            this.keys = other.keys.clone();
+            this.values = other.values.clone();
+            this.size = other.size;
             this.map = null;
-        } else {
-            this.list = null;
-            this.map = new TreeMap<>(other.map);
         }
     }
 
-    public TrieNode get(String key) {
-        if (list != null) {
-            for (Entry e : list) {
-                if (e.key.equals(key)) return e.node;
-            }
-            return null;
-        } else {
-            return map.get(key);
+    public TrieNode get(int key) {
+        if (map != null) return map.get(key);
+
+        // Лінійний пошук по масиву (для <= 8 елементів це швидше за хешування!)
+        for (int i = 0; i < size; i++) {
+            if (keys[i] == key) return values[i];
         }
+        return null;
     }
 
-    public void put(String key, TrieNode node) {
-        if (list != null) {
-            for (int i = 0; i < list.size(); i++) {
-                if (list.get(i).key.equals(key)) {
-                    list.set(i, new Entry(key, node));
-                    return;
-                }
-            }
-            list.add(new Entry(key, node));
-
-            if (list.size() > LIST_THRESHOLD) {
-                map = new HashMap<>();
-                for (Entry e : list) {
-                    map.put(e.key, e.node);
-                }
-                list = null;
-            }
-        } else {
+    public void put(int key, TrieNode node) {
+        if (map != null) {
             map.put(key, node);
+            return;
         }
-    }
 
-    public Set<Map.Entry<String, TrieNode>> entrySet() {
-        if (list != null) {
-            Set<Map.Entry<String, TrieNode>> set = new HashSet<>();
-            for (Entry e : list) {
-                set.add(new AbstractMap.SimpleEntry<>(e.key, e.node));
+        for (int i = 0; i < size; i++) {
+            if (keys[i] == key) {
+                values[i] = node;
+                return;
             }
-            return set;
+        }
+        if (size < THRESHOLD) {
+            keys[size] = key;
+            values[size] = node;
+            size++;
         } else {
-            return map.entrySet();
+            map = new Int2ObjectOpenHashMap<>(THRESHOLD * 2);
+            for (int i = 0; i < size; i++) {
+                map.put(keys[i], values[i]);
+            }
+            map.put(key, node);
+
+            keys = null;
+            values = null;
         }
     }
 
     public boolean isEmpty() {
-        if (list != null) return list.isEmpty();
-        return map.isEmpty();
+        return map != null ? map.isEmpty() : size == 0;
     }
 
     public void clear() {
-        if (list != null) {
-            list.clear();
-        } else {
+        if (map != null) {
             map.clear();
+        } else {
+            Arrays.fill(values, 0, size, null);
+            size = 0;
+        }
+    }
+
+    @FunctionalInterface
+    public interface NodeConsumer {
+        void accept(int key, TrieNode node);
+    }
+
+    public void forEach(NodeConsumer action) {
+        if (map != null) {
+            for (Int2ObjectMap.Entry<TrieNode> entry : map.int2ObjectEntrySet()) {
+                action.accept(entry.getIntKey(), entry.getValue());
+            }
+        } else {
+            for (int i = 0; i < size; i++) {
+                action.accept(keys[i], values[i]);
+            }
         }
     }
 }

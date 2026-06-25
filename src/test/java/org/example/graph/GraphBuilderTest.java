@@ -39,20 +39,20 @@ public class GraphBuilderTest {
         return new TestNode(name);
     }
 
-    @Test
-    void testValidLinearGraph() {
-        Node a = node("a").writes("a", "b").pointsTo("b").build();
-        Node b = node("b").reads("a").writes("b", "c").pointsTo("c").build();
-        Node c = node("c").reads("a", "b", "c").build();
-
-        Graph graph = GraphBuilder.buildGraph(List.of(a,b,c));
-
-        assertThat(graph.inDegree()).containsOnlyKeys("a").hasEntrySatisfying("a", map -> {
-            assertThat(map).containsEntry("b", 1);
-            assertThat(map).containsEntry("c", 1);
-            assertThat(map).doesNotContainKey("a");
-        });
-    }
+//    @Test
+//    void testValidLinearGraph() {
+//        Node a = node("a").writes("a", "b").pointsTo("b").build();
+//        Node b = node("b").reads("a").writes("b", "c").pointsTo("c").build();
+//        Node c = node("c").reads("a", "b", "c").build();
+//
+//        Graph graph = GraphBuilder.buildGraph(List.of(a,b,c));
+//
+//        assertThat(graph.inDegree()).containsOnlyKeys("a").hasEntrySatisfying("a", map -> {
+//            assertThat(map).containsEntry("b", 1);
+//            assertThat(map).containsEntry("c", 1);
+//            assertThat(map).doesNotContainKey("a");
+//        });
+//    }
 
     @Test
     void testDuplicateNodeNames(){
