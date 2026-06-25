@@ -245,7 +245,7 @@ public class GraphBuilder {
 
     private static void validateKeyUsage(int root, Map<String, KeyPath> parsedKeys, CompiledNode[] graph, int[] inDegree, int rootCtxId, int sinkNodeId) {
         int[] inDegreeCopy = Arrays.copyOf(inDegree, inDegree.length);
-        Int2ObjectArrayMap<BranchContext> states = new Int2ObjectArrayMap<>();
+        Int2ObjectOpenHashMap<BranchContext> states = new Int2ObjectOpenHashMap<>();
         AtomicInteger lastContextId = new AtomicInteger();
         IntArrayFIFOQueue toVisit = new IntArrayFIFOQueue();
         toVisit.enqueue(root);
