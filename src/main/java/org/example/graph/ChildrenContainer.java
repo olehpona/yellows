@@ -3,106 +3,101 @@ package org.example.graph;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 
-import java.util.Arrays;
+import java.util.*;
 
 public class ChildrenContainer {
-    private static final int THRESHOLD = 8;
+    private static final int LIST_THRESHOLD = 8;
 
-    // Стан 1: Паралельні масиви (для малих вузлів)
-    private int[] keys;
-    private TrieNode[] values;
-    private int size;
-
-    // Стан 2: Хеш-мапа (для великих вузлів)
+    private List<Entry> list;
     private Int2ObjectOpenHashMap<TrieNode> map;
 
+    // Рекорд тепер реалізує інтерфейс fastutil для сумісності з примітивами
+    public record Entry(int key, TrieNode node) implements Int2ObjectMap.Entry<TrieNode> {
+        @Override
+        public int getIntKey() {
+            return key;
+        }
+
+        @Override
+        public TrieNode getValue() {
+            return node;
+        }
+
+        @Override
+        public TrieNode setValue(TrieNode value) {
+            throw new UnsupportedOperationException("Entries are immutable");
+        }
+    }
+
     public ChildrenContainer() {
-        this.keys = new int[THRESHOLD];
-        this.values = new TrieNode[THRESHOLD];
-        this.size = 0;
+        this.list = new ArrayList<>(); // Лінива ініціалізація (0 байт під масив на старті)
         this.map = null;
     }
 
-    // Конструктор копіювання (COW)
     public ChildrenContainer(ChildrenContainer other) {
-        if (other.map != null) {
-            // fastutil має вбудований швидкий конструктор копіювання
-            this.map = new Int2ObjectOpenHashMap<>(other.map);
-            this.keys = null;
-            this.values = null;
-        } else {
-            this.keys = other.keys.clone();
-            this.values = other.values.clone();
-            this.size = other.size;
+        if (other.list != null) {
+            this.list = new ArrayList<>(other.list);
             this.map = null;
+        } else {
+            this.list = null;
+            this.map = new Int2ObjectOpenHashMap<>(other.map);
         }
     }
 
     public TrieNode get(int key) {
-        if (map != null) return map.get(key);
-
-        // Лінійний пошук по масиву (для <= 8 елементів це швидше за хешування!)
-        for (int i = 0; i < size; i++) {
-            if (keys[i] == key) return values[i];
+        if (list != null) {
+            for (Entry e : list) {
+                if (e.key == key) return e.node;
+            }
+            return null;
+        } else {
+            return map.get(key);
         }
-        return null;
     }
 
     public void put(int key, TrieNode node) {
-        if (map != null) {
-            map.put(key, node);
-            return;
-        }
-
-        for (int i = 0; i < size; i++) {
-            if (keys[i] == key) {
-                values[i] = node;
-                return;
+        if (list != null) {
+            for (int i = 0; i < list.size(); i++) {
+                if (list.get(i).key == key) {
+                    list.set(i, new Entry(key, node));
+                    return;
+                }
             }
-        }
-        if (size < THRESHOLD) {
-            keys[size] = key;
-            values[size] = node;
-            size++;
+            list.add(new Entry(key, node));
+
+            if (list.size() > LIST_THRESHOLD) {
+                map = new Int2ObjectOpenHashMap<>(LIST_THRESHOLD * 2);
+                for (Entry e : list) {
+                    map.put(e.key, e.node);
+                }
+                list = null;
+            }
         } else {
-            map = new Int2ObjectOpenHashMap<>(THRESHOLD * 2);
-            for (int i = 0; i < size; i++) {
-                map.put(keys[i], values[i]);
-            }
             map.put(key, node);
+        }
+    }
 
-            keys = null;
-            values = null;
+    // Повертає набір сумісних примітивних ентрі
+    public Set<Int2ObjectMap.Entry<TrieNode>> entrySet() {
+        if (list != null) {
+            Set<Int2ObjectMap.Entry<TrieNode>> set = new LinkedHashSet<>(list.size());
+            set.addAll(list);
+            return set;
+        } else {
+            return map.int2ObjectEntrySet();
         }
     }
 
     public boolean isEmpty() {
-        return map != null ? map.isEmpty() : size == 0;
+        if (list != null) return list.isEmpty();
+        return map.isEmpty();
     }
 
     public void clear() {
-        if (map != null) {
+        if (list != null) {
+            list.clear();
+        } else {
             map.clear();
-        } else {
-            Arrays.fill(values, 0, size, null);
-            size = 0;
-        }
-    }
-
-    @FunctionalInterface
-    public interface NodeConsumer {
-        void accept(int key, TrieNode node);
-    }
-
-    public void forEach(NodeConsumer action) {
-        if (map != null) {
-            for (Int2ObjectMap.Entry<TrieNode> entry : map.int2ObjectEntrySet()) {
-                action.accept(entry.getIntKey(), entry.getValue());
-            }
-        } else {
-            for (int i = 0; i < size; i++) {
-                action.accept(keys[i], values[i]);
-            }
         }
     }
 }

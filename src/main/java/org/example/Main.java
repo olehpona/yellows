@@ -15,8 +15,8 @@ public class Main {
     }
 
     static void create() {
-        int LAYERS = 10;
-        int NODES_PER_LAYER = 10000;
+        int LAYERS = 1;
+        int NODES_PER_LAYER = 1000000;
 
         Random random = new Random();
         List<Map<String, Object>> graph = new ArrayList<>();

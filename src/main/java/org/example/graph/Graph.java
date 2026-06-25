@@ -1,6 +1,6 @@
 package org.example.graph;
 
-import java.util.Map;
+import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 
-public record Graph(int[][] inDegree, CompiledNode[] nodes) {
+public record Graph(Int2IntOpenHashMap[] inDegree, CompiledNode[] nodes) {
 }

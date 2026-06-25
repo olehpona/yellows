@@ -33,18 +33,15 @@ public class GraphBuilder {
 
 
         IntSet reachableNodes = new IntOpenHashSet();
-        int[][] inDegrees = new int[roots.size()][]; // nodeMap.size() -1?
+        Int2IntOpenHashMap[] inDegrees = new Int2IntOpenHashMap[roots.size()];  // nodeMap.size() -1?
 
         try (ExecutorService executor = Executors.newFixedThreadPool(Math.min(threadCount, roots.size()))) {
             List<CompletableFuture<Void>> futures = roots.stream().map(root -> {
                 int rootId = dict.register(root);
                 var traversalResult = calculateInDegreesAndDetectLoops(rootId, compiledNodes);
                 inDegrees[rootId] = traversalResult.inDegree;
-                for (int i =0; i< traversalResult.reachable.length; ++i) {
-                    if (traversalResult.reachable[i]) {
-                        reachableNodes.add(i);
-                    }
-                }
+
+                reachableNodes.addAll(traversalResult.reachable);
                 reachableNodes.add(rootId);
 
                 return CompletableFuture.runAsync(() -> validateKeyUsage(rootId,parsedKeys, compiledNodes, traversalResult.inDegree, rootCtx, sinkNode), executor);
@@ -126,13 +123,13 @@ public class GraphBuilder {
     }
 
     record TraversalResult(
-            int[] inDegree,
-            boolean[] reachable
+            Int2IntOpenHashMap inDegree,
+            IntSet reachable
     ) {}
 
     private static TraversalResult calculateInDegreesAndDetectLoops(int root, CompiledNode[] graph) {
-        int[] inDegree = new int[graph.length];
-        boolean[] reachable = new boolean[graph.length];
+        Int2IntOpenHashMap inDegree = new Int2IntOpenHashMap();
+        IntSet reachable = new IntOpenHashSet();
         IntSet inProcess = new IntOpenHashSet();
 
         record VisitRecord(int node, boolean isOut){};
@@ -153,12 +150,12 @@ public class GraphBuilder {
                 inProcess.add(node.node);
                 toVisit.add(new VisitRecord(node.node(), true));
                 for (int next: graph[(node.node())].next()) {
-                    if (inDegree[next] == 0) {
-                        inDegree[next] = 1;
-                        reachable[next] = true;
+                    if (!inDegree.containsKey(next)) {
+                        inDegree.put(next, 1);
+                        reachable.add(next);
                         toVisit.add(new VisitRecord(next, false));
                     } else {
-                        inDegree[next]++;
+                        inDegree.put(next, inDegree.get(next) + 1);
                     }
                 }
             }
@@ -225,7 +222,9 @@ public class GraphBuilder {
                 current.hasReadDeeper = current.hasReadDeeper || source.hasReadDeeper;
             }
 
-            source.children.forEach(((key, sourceChild) -> {
+            for (Int2ObjectMap.Entry<TrieNode> entry : source.children.entrySet()) {
+                int key = entry.getIntKey();
+                TrieNode sourceChild = entry.getValue();
                 TrieNode currentChild = current.children.get(key);
 
                 if (currentChild == sourceChild) return;
@@ -239,12 +238,12 @@ public class GraphBuilder {
                     }
                     merge(currentChild, sourceChild);
                 }
-            }));
+            }
         }
     }
 
-    private static void validateKeyUsage(int root, Map<String, KeyPath> parsedKeys, CompiledNode[] graph, int[] inDegree, int rootCtxId, int sinkNodeId) {
-        int[] inDegreeCopy = Arrays.copyOf(inDegree, inDegree.length);
+    private static void validateKeyUsage(int root, Map<String, KeyPath> parsedKeys, CompiledNode[] graph, Int2IntOpenHashMap inDegree, int rootCtxId, int sinkNodeId) {
+        Int2IntOpenHashMap inDegreeCopy = new Int2IntOpenHashMap(inDegree);
         Int2ObjectOpenHashMap<BranchContext> states = new Int2ObjectOpenHashMap<>();
         AtomicInteger lastContextId = new AtomicInteger();
         IntArrayFIFOQueue toVisit = new IntArrayFIFOQueue();
@@ -266,7 +265,7 @@ public class GraphBuilder {
             }
 
             for (int next : node.next()) {
-                if (inDegree[next] == 1) {
+                if (inDegree.get(next) == 1) {
                     BranchContext newContext;
 
                     if (node.next().length == 1) {
@@ -281,8 +280,8 @@ public class GraphBuilder {
                     mergeAndValidateStates(currentState, nextState, next);
                 }
 
-                int newInDegree = inDegreeCopy[next] - 1;
-                inDegreeCopy[next] = newInDegree;
+                int newInDegree = inDegreeCopy.get(next) - 1;
+                inDegreeCopy.put(next, newInDegree);
                 if (newInDegree == 0) toVisit.enqueue(next);
             }
         }
@@ -311,12 +310,12 @@ public class GraphBuilder {
             return;
         }
 
-        updates.children.forEach((key, node) -> {
-            TrieNode currentNode = current.children.get(key);
+        for (Int2ObjectMap.Entry<TrieNode> entry : updates.children.entrySet()) {
+            TrieNode currentNode = current.children.get(entry.getIntKey());
             if (currentNode != null) {
-                checkOverlap(currentNode, node, mergeNode);
+                checkOverlap(currentNode, entry.getValue(), mergeNode);
             }
-        });
+        }
     }
 
     private static void throwContextCollisionError(int mergeNode, int currentAuthor, int updateAuthor) {
