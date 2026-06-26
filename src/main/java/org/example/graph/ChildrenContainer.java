@@ -11,7 +11,6 @@ public class ChildrenContainer {
     private List<Entry> list;
     private Int2ObjectOpenHashMap<TrieNode> map;
 
-    // Рекорд тепер реалізує інтерфейс fastutil для сумісності з примітивами
     public record Entry(int key, TrieNode node) implements Int2ObjectMap.Entry<TrieNode> {
         @Override
         public int getIntKey() {
@@ -30,7 +29,7 @@ public class ChildrenContainer {
     }
 
     public ChildrenContainer() {
-        this.list = new ArrayList<>(); // Лінива ініціалізація (0 байт під масив на старті)
+        this.list = new ArrayList<>();
         this.map = null;
     }
 
@@ -77,12 +76,9 @@ public class ChildrenContainer {
         }
     }
 
-    // Повертає набір сумісних примітивних ентрі
-    public Set<Int2ObjectMap.Entry<TrieNode>> entrySet() {
+    public Collection<? extends Int2ObjectMap.Entry<TrieNode>> entrySet() {
         if (list != null) {
-            Set<Int2ObjectMap.Entry<TrieNode>> set = new LinkedHashSet<>(list.size());
-            set.addAll(list);
-            return set;
+            return list;
         } else {
             return map.int2ObjectEntrySet();
         }

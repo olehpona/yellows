@@ -14,23 +14,11 @@ public class GraphBuilder {
     public static Graph buildGraph(List<Node> nodes, int threadCount) {
         SymbolTable dict = new SymbolTable();
 
-        Map<String, Node> nodeMap = buildAndValidateNodeMap(nodes);
         List<String> roots = findRoots(nodes);
-        CompiledNode[] compiledNodes = compileNodes(nodes, dict, roots);
-        Map<String, KeyPath> parsedKeys = new HashMap<>();
-
-        for (CompiledNode el: compiledNodes) {
-            for (String key: el.input().values()) {
-                parsedKeys.put(key, KeyPath.fromString(key, dict));
-            }
-            for (String key: el.output().values()) {
-                parsedKeys.put(key, KeyPath.fromString(key, dict));
-            }
-        }
+        CompilationResult res = compileNodes(nodes, dict, roots);
 
         int sinkNode = dict.register(SINK_NODE);
         int rootCtx = dict.register(ROOT_AUTHOR);
-
 
         IntSet reachableNodes = new IntOpenHashSet();
         Int2IntOpenHashMap[] inDegrees = new Int2IntOpenHashMap[roots.size()];  // nodeMap.size() -1?
@@ -38,13 +26,13 @@ public class GraphBuilder {
         try (ExecutorService executor = Executors.newFixedThreadPool(Math.min(threadCount, roots.size()))) {
             List<CompletableFuture<Void>> futures = roots.stream().map(root -> {
                 int rootId = dict.register(root);
-                var traversalResult = calculateInDegreesAndDetectLoops(rootId, compiledNodes);
-                inDegrees[rootId] = traversalResult.inDegree;
+                var traversalResult = calculateInDegreesAndDetectLoops(rootId, res.nodes);
+                inDegrees[rootId] = traversalResult;
 
-                reachableNodes.addAll(traversalResult.reachable);
+                reachableNodes.addAll(traversalResult.keySet());
                 reachableNodes.add(rootId);
 
-                return CompletableFuture.runAsync(() -> validateKeyUsage(rootId,parsedKeys, compiledNodes, traversalResult.inDegree, rootCtx, sinkNode), executor);
+                return CompletableFuture.runAsync(() -> validateKeyUsage(rootId,res.parsedKeys, res.nodes, traversalResult, rootCtx, sinkNode), executor);
             }).toList();
 
             try {
@@ -61,21 +49,11 @@ public class GraphBuilder {
             throw new GraphException(GraphExceptionCode.ERR_LOOP, "Unreachable disconnected loop detected!");
         }
 
-        return new Graph(inDegrees, compiledNodes);
+        return new Graph(inDegrees, res.nodes);
     }
 
     public static Graph buildGraph(List<Node> nodes) {
         return buildGraph(nodes, 1);
-    }
-
-    private static Map<String, Node> buildAndValidateNodeMap(List<Node> nodes) {
-        return nodes.stream().collect(Collectors.toUnmodifiableMap(
-                Node::name,
-                node -> node,
-                (existing, _replacement) -> {
-                    throw new GraphException(GraphExceptionCode.ERR_DUPLICATE_NODE, "Duplicate node found: " + existing.name());
-                }
-        ));
     }
 
     private static List<String> findRoots(List<Node> nodes) {
@@ -95,7 +73,7 @@ public class GraphBuilder {
         return roots;
     }
 
-    private static CompiledNode[] compileNodes(List<Node> rawNodes, SymbolTable dict, List<String> rootNames) {
+    private static CompilationResult compileNodes(List<Node> rawNodes, SymbolTable dict, List<String> rootNames) {
         for (String rootName : rootNames) {
             dict.register(rootName);
         }
@@ -104,32 +82,50 @@ public class GraphBuilder {
         }
 
         CompiledNode[] compiledNodes = new CompiledNode[rawNodes.size()];
+        Map<String, KeyPath> parsedKeys = new HashMap<>();
+        IntSet usedNames = new IntOpenHashSet();
 
         for (Node raw : rawNodes) {
             int nodeId = dict.register(raw.name());
+            if (usedNames.contains(nodeId)) {
+                throw new GraphException(GraphExceptionCode.ERR_DUPLICATE_NODE, "Duplicate nodes found");
+            } else {
+                usedNames.add(nodeId);
+            }
             BitSet nextSet = new BitSet();
             int[] nextList = new int[raw.next().size()];
             int i = 0;
-            for (String next: raw.next()) {
+            for (String next : raw.next()) {
                 int nextId = dict.register(next);
                 nextSet.set(nextId);
-                nextList[i] = nextId;
-                i++;
+                nextList[i++] = nextId;
             }
             compiledNodes[nodeId] = new CompiledNode(raw.input(), raw.output(), nextSet, nextList);
+
+            for (String key : raw.input().values()) {
+                if (!parsedKeys.containsKey(key)) {
+                    parsedKeys.put(key, KeyPath.fromString(key, dict));
+                }
+            }
+            for (String key : raw.output().values()) {
+                if (!parsedKeys.containsKey(key)) {
+                    parsedKeys.put(key, KeyPath.fromString(key, dict));
+                }
+            }
         }
 
-        return compiledNodes;
+        return new CompilationResult(compiledNodes, parsedKeys);
     }
 
-    record TraversalResult(
+    private record CompilationResult(CompiledNode[] nodes, Map<String, KeyPath> parsedKeys) {}
+
+    private record TraversalResult(
             Int2IntOpenHashMap inDegree,
             IntSet reachable
     ) {}
 
-    private static TraversalResult calculateInDegreesAndDetectLoops(int root, CompiledNode[] graph) {
+    private static Int2IntOpenHashMap calculateInDegreesAndDetectLoops(int root, CompiledNode[] graph) {
         Int2IntOpenHashMap inDegree = new Int2IntOpenHashMap();
-        IntSet reachable = new IntOpenHashSet();
         IntSet inProcess = new IntOpenHashSet();
 
         record VisitRecord(int node, boolean isOut){};
@@ -144,15 +140,14 @@ public class GraphBuilder {
             if (node.isOut()) {
                 inProcess.remove(node.node());
             } else {
-                if (inProcess.contains(node.node())) {
+                if (!inProcess.add(node.node)) {
                     throw new GraphException(GraphExceptionCode.ERR_LOOP, String.format("Loop detected at node %s from root %s", node.node(), root));
                 }
-                inProcess.add(node.node);
+
                 toVisit.add(new VisitRecord(node.node(), true));
                 for (int next: graph[(node.node())].next()) {
                     if (!inDegree.containsKey(next)) {
                         inDegree.put(next, 1);
-                        reachable.add(next);
                         toVisit.add(new VisitRecord(next, false));
                     } else {
                         inDegree.put(next, inDegree.get(next) + 1);
@@ -161,7 +156,7 @@ public class GraphBuilder {
             }
         }
 
-        return new TraversalResult(inDegree, reachable);
+        return inDegree;
     }
 
     private static class BranchContext {
