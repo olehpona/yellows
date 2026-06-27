@@ -1,5 +1,6 @@
 plugins {
     id("java")
+    jacoco
 }
 
 group = "org.example"
@@ -23,4 +24,9 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+    finalizedBy(tasks.jacocoTestReport) // report is always generated after tests run
+}
+
+tasks.jacocoTestReport {
+    dependsOn(tasks.test)
 }

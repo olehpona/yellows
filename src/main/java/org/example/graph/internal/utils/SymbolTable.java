@@ -1,4 +1,4 @@
-package org.example.graph;
+package org.example.graph.internal.utils;
 
 import java.util.ArrayList;
 import java.util.HashMap;

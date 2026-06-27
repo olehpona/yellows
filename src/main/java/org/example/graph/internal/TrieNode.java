@@ -1,4 +1,4 @@
-package org.example.graph;
+package org.example.graph.internal;
 
 public class TrieNode {
     public int author;

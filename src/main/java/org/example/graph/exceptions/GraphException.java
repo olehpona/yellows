@@ -1,4 +1,4 @@
-package org.example.graph;
+package org.example.graph.exceptions;
 
 public class GraphException extends RuntimeException {
     private final GraphExceptionCode exceptionCode;

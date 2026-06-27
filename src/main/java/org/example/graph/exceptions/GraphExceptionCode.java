@@ -1,4 +1,4 @@
-package org.example.graph;
+package org.example.graph.exceptions;
 
 public enum GraphExceptionCode {
     ERR_CONTEXT_COLLISION,

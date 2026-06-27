@@ -1,6 +1,9 @@
 package org.example.graph;
 
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
+import org.example.graph.internal.utils.SymbolTable;
 
-public record Graph(Int2IntOpenHashMap[] inDegree, CompiledNode[] nodes) {
+import java.util.List;
+
+public record Graph(List<Int2IntOpenHashMap> inDegree, List<CompiledNode> nodes, SymbolTable dict) {
 }

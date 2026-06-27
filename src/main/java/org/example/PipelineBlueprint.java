@@ -1,9 +1,6 @@
 package org.example;
 
 import org.example.graph.Graph;
-import org.example.graph.Node;
-
-import java.util.Map;
 
 public class PipelineBlueprint {
     private final Graph graph;

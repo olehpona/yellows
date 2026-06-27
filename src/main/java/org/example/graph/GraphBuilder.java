@@ -1,11 +1,16 @@
 package org.example.graph;
 
 import it.unimi.dsi.fastutil.ints.*;
+import org.example.graph.exceptions.GraphException;
+import org.example.graph.exceptions.GraphExceptionCode;
+import org.example.graph.internal.GraphAnalyzer;
+import org.example.graph.internal.GraphCompiler;
+import org.example.graph.internal.GraphValidator;
+import org.example.graph.internal.utils.SymbolTable;
 
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
+
 
 public class GraphBuilder {
     private static final String ROOT_AUTHOR = "__CTX__";
@@ -14,25 +19,25 @@ public class GraphBuilder {
     public static Graph buildGraph(List<Node> nodes, int threadCount) {
         SymbolTable dict = new SymbolTable();
 
-        List<String> roots = findRoots(nodes);
-        CompilationResult res = compileNodes(nodes, dict, roots);
+        List<String> roots = GraphAnalyzer.findRoots(nodes);
+        List<CompiledNode> res = GraphCompiler.compileNodes(nodes, dict, roots);
 
         int sinkNode = dict.register(SINK_NODE);
         int rootCtx = dict.register(ROOT_AUTHOR);
 
         IntSet reachableNodes = new IntOpenHashSet();
-        Int2IntOpenHashMap[] inDegrees = new Int2IntOpenHashMap[roots.size()];  // nodeMap.size() -1?
+        Int2IntOpenHashMap[] inDegrees = new Int2IntOpenHashMap[roots.size()];
 
         try (ExecutorService executor = Executors.newFixedThreadPool(Math.min(threadCount, roots.size()))) {
             List<CompletableFuture<Void>> futures = roots.stream().map(root -> {
                 int rootId = dict.register(root);
-                var traversalResult = calculateInDegreesAndDetectLoops(rootId, res.nodes);
+                var traversalResult = GraphAnalyzer.calculateInDegreesAndDetectLoops(rootId, res);
                 inDegrees[rootId] = traversalResult;
 
                 reachableNodes.addAll(traversalResult.keySet());
                 reachableNodes.add(rootId);
 
-                return CompletableFuture.runAsync(() -> validateKeyUsage(rootId,res.parsedKeys, res.nodes, traversalResult, rootCtx, sinkNode), executor);
+                return CompletableFuture.runAsync(() -> GraphValidator.validateKeyUsage(rootId, res, traversalResult, rootCtx, sinkNode), executor);
             }).toList();
 
             try {
@@ -49,273 +54,11 @@ public class GraphBuilder {
             throw new GraphException(GraphExceptionCode.ERR_LOOP, "Unreachable disconnected loop detected!");
         }
 
-        return new Graph(inDegrees, res.nodes);
+        return new Graph(Arrays.asList(inDegrees), res, dict);
     }
 
     public static Graph buildGraph(List<Node> nodes) {
         return buildGraph(nodes, 1);
     }
 
-    private static List<String> findRoots(List<Node> nodes) {
-        Set<String> children = nodes.stream()
-                .flatMap(node -> node.next().stream())
-                .collect(Collectors.toSet());
-
-        List<String> roots = nodes.stream()
-                .map(Node::name)
-                .filter(name -> !children.contains(name))
-                .toList();
-
-        if (roots.isEmpty() && !nodes.isEmpty()) {
-            throw new GraphException(GraphExceptionCode.ERR_LOOP, "No root nodes found, graph contains loop");
-        }
-
-        return roots;
-    }
-
-    private static CompilationResult compileNodes(List<Node> rawNodes, SymbolTable dict, List<String> rootNames) {
-        for (String rootName : rootNames) {
-            dict.register(rootName);
-        }
-        for (Node raw : rawNodes) {
-            dict.register(raw.name());
-        }
-
-        CompiledNode[] compiledNodes = new CompiledNode[rawNodes.size()];
-        Map<String, KeyPath> parsedKeys = new HashMap<>();
-        IntSet usedNames = new IntOpenHashSet();
-
-        for (Node raw : rawNodes) {
-            int nodeId = dict.register(raw.name());
-            if (usedNames.contains(nodeId)) {
-                throw new GraphException(GraphExceptionCode.ERR_DUPLICATE_NODE, "Duplicate nodes found");
-            } else {
-                usedNames.add(nodeId);
-            }
-            BitSet nextSet = new BitSet();
-            int[] nextList = new int[raw.next().size()];
-            int i = 0;
-            for (String next : raw.next()) {
-                int nextId = dict.register(next);
-                nextSet.set(nextId);
-                nextList[i++] = nextId;
-            }
-            compiledNodes[nodeId] = new CompiledNode(raw.input(), raw.output(), nextSet, nextList);
-
-            for (String key : raw.input().values()) {
-                if (!parsedKeys.containsKey(key)) {
-                    parsedKeys.put(key, KeyPath.fromString(key, dict));
-                }
-            }
-            for (String key : raw.output().values()) {
-                if (!parsedKeys.containsKey(key)) {
-                    parsedKeys.put(key, KeyPath.fromString(key, dict));
-                }
-            }
-        }
-
-        return new CompilationResult(compiledNodes, parsedKeys);
-    }
-
-    private record CompilationResult(CompiledNode[] nodes, Map<String, KeyPath> parsedKeys) {}
-
-    private record TraversalResult(
-            Int2IntOpenHashMap inDegree,
-            IntSet reachable
-    ) {}
-
-    private static Int2IntOpenHashMap calculateInDegreesAndDetectLoops(int root, CompiledNode[] graph) {
-        Int2IntOpenHashMap inDegree = new Int2IntOpenHashMap();
-        IntSet inProcess = new IntOpenHashSet();
-
-        record VisitRecord(int node, boolean isOut){};
-        List<VisitRecord> toVisit = new ArrayList<>();
-
-        toVisit.add(new VisitRecord(root, false));
-
-        while (!toVisit.isEmpty()) {
-            var node = toVisit.getLast();
-            toVisit.removeLast();
-
-            if (node.isOut()) {
-                inProcess.remove(node.node());
-            } else {
-                if (!inProcess.add(node.node)) {
-                    throw new GraphException(GraphExceptionCode.ERR_LOOP, String.format("Loop detected at node %s from root %s", node.node(), root));
-                }
-
-                toVisit.add(new VisitRecord(node.node(), true));
-                for (int next: graph[(node.node())].next()) {
-                    if (!inDegree.containsKey(next)) {
-                        inDegree.put(next, 1);
-                        toVisit.add(new VisitRecord(next, false));
-                    } else {
-                        inDegree.put(next, inDegree.get(next) + 1);
-                    }
-                }
-            }
-        }
-
-        return inDegree;
-    }
-
-    private static class BranchContext {
-        TrieNode writes;
-        int contextId;
-
-        BranchContext(int contextId, int rootAuthorId) {
-            writes = new TrieNode(contextId, rootAuthorId);
-            this.contextId = contextId;
-        }
-
-        BranchContext(BranchContext parent, int contextId) {
-            this.contextId = contextId;
-            this.writes = new TrieNode(parent.writes, contextId);
-        }
-
-        public void setAuthor(KeyPath keyPath, int author, boolean isWrite) {
-            TrieNode current = writes;
-
-            for (int currentKey: keyPath.segments()){
-                TrieNode parent = current;
-                current = current.children.get(currentKey);
-
-                if (current == null) {
-                    current = new TrieNode(contextId, parent.author);
-                    parent.children.put(currentKey, current);
-                } else if (current.contextId != this.contextId) {
-                    current = new TrieNode(current, this.contextId);
-                    parent.children.put(currentKey, current);
-                }
-                parent.hasWriteDeeper = parent.hasWriteDeeper || isWrite;
-                parent.hasReadDeeper = parent.hasReadDeeper || !isWrite;
-
-            }
-
-            if (isWrite) {
-                current.author = author;
-                current.isExplicit = true;
-                current.children.clear();
-                current.hasReader = false;
-            } else {
-                current.hasReader = true;
-            }
-        }
-
-        public void merge(TrieNode current, TrieNode source) {
-            if (source.isExplicit) {
-                current.author = source.author;
-                current.isExplicit = true;
-                current.children.clear();
-                current.hasReader = true;
-                current.hasWriteDeeper = false;
-                current.hasReadDeeper = false;
-                return;
-            } else {
-                current.hasReader = current.hasReader || source.hasReader;
-                current.hasWriteDeeper = current.hasWriteDeeper || source.hasWriteDeeper;
-                current.hasReadDeeper = current.hasReadDeeper || source.hasReadDeeper;
-            }
-
-            for (Int2ObjectMap.Entry<TrieNode> entry : source.children.entrySet()) {
-                int key = entry.getIntKey();
-                TrieNode sourceChild = entry.getValue();
-                TrieNode currentChild = current.children.get(key);
-
-                if (currentChild == sourceChild) return;
-
-                if (currentChild == null) {
-                    current.children.put(key, sourceChild);
-                } else {
-                    if (currentChild.contextId != this.contextId) {
-                        currentChild = new TrieNode(currentChild, this.contextId);
-                        current.children.put(key, currentChild);
-                    }
-                    merge(currentChild, sourceChild);
-                }
-            }
-        }
-    }
-
-    private static void validateKeyUsage(int root, Map<String, KeyPath> parsedKeys, CompiledNode[] graph, Int2IntOpenHashMap inDegree, int rootCtxId, int sinkNodeId) {
-        Int2IntOpenHashMap inDegreeCopy = new Int2IntOpenHashMap(inDegree);
-        Int2ObjectOpenHashMap<BranchContext> states = new Int2ObjectOpenHashMap<>();
-        AtomicInteger lastContextId = new AtomicInteger();
-        IntArrayFIFOQueue toVisit = new IntArrayFIFOQueue();
-        toVisit.enqueue(root);
-        states.put(root, new BranchContext(lastContextId.incrementAndGet(), rootCtxId));
-        states.put(sinkNodeId, new BranchContext(lastContextId.incrementAndGet(), rootCtxId));
-
-        while (!toVisit.isEmpty()) {
-            int nodeName = toVisit.dequeueInt();
-            CompiledNode node = graph[nodeName];
-            BranchContext currentState = states.remove(nodeName);
-
-            for (String inKey : node.input().values()) currentState.setAuthor(parsedKeys.get(inKey), nodeName, false);
-            for (String outKey : node.output().values()) currentState.setAuthor(parsedKeys.get(outKey), nodeName, true);
-
-            if (node.next().length == 0) {
-                mergeAndValidateStates(currentState, states.get(sinkNodeId), sinkNodeId);
-                continue;
-            }
-
-            for (int next : node.next()) {
-                if (inDegree.get(next) == 1) {
-                    BranchContext newContext;
-
-                    if (node.next().length == 1) {
-                        newContext = currentState;
-                    } else {
-                        newContext = new BranchContext(currentState, lastContextId.incrementAndGet());
-                    }
-                    states.put(next, newContext);
-
-                } else {
-                    BranchContext nextState = states.computeIfAbsent(next, k -> new BranchContext(lastContextId.incrementAndGet(), rootCtxId));
-                    mergeAndValidateStates(currentState, nextState, next);
-                }
-
-                int newInDegree = inDegreeCopy.get(next) - 1;
-                inDegreeCopy.put(next, newInDegree);
-                if (newInDegree == 0) toVisit.enqueue(next);
-            }
-        }
-    }
-
-    private static void mergeAndValidateStates(BranchContext currCtx, BranchContext nextCtx, int mergeNode) {
-        checkOverlap(currCtx.writes, nextCtx.writes, mergeNode);
-        nextCtx.merge(nextCtx.writes, currCtx.writes);
-    }
-
-    private static void checkOverlap(TrieNode current, TrieNode updates, int mergeNode) {
-        if (current == updates) return;
-
-        if (!updates.isExplicit && !updates.hasReader && updates.children.isEmpty()) return;
-        if (!current.isExplicit && !current.hasReader && current.children.isEmpty()) return;
-
-        if (current.author != updates.author) {
-            throwContextCollisionError(mergeNode, current.author, updates.author);
-        }
-
-        if ((current.hasReader && updates.hasWriteDeeper) || (updates.hasReader && current.hasWriteDeeper)) {
-            throwContextCollisionError(mergeNode, current.author, updates.author);
-        }
-
-        if (!current.hasWriteDeeper && !updates.hasWriteDeeper) {
-            return;
-        }
-
-        for (Int2ObjectMap.Entry<TrieNode> entry : updates.children.entrySet()) {
-            TrieNode currentNode = current.children.get(entry.getIntKey());
-            if (currentNode != null) {
-                checkOverlap(currentNode, entry.getValue(), mergeNode);
-            }
-        }
-    }
-
-    private static void throwContextCollisionError(int mergeNode, int currentAuthor, int updateAuthor) {
-        throw new GraphException(GraphExceptionCode.ERR_CONTEXT_COLLISION,
-                String.format("Race condition at merge node '%d'. Disagreement over ownership (Branch A says '%d', Branch B says '%d')",
-                        mergeNode, currentAuthor, updateAuthor));
-    }
 }

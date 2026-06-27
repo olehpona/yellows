@@ -1,5 +1,8 @@
 package org.example.graph;
 
+import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
+import org.example.graph.exceptions.GraphException;
+import org.example.graph.exceptions.GraphExceptionCode;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 import static org.junit.jupiter.api.Assertions.*;
@@ -39,20 +42,28 @@ public class GraphBuilderTest {
         return new TestNode(name);
     }
 
-//    @Test
-//    void testValidLinearGraph() {
-//        Node a = node("a").writes("a", "b").pointsTo("b").build();
-//        Node b = node("b").reads("a").writes("b", "c").pointsTo("c").build();
-//        Node c = node("c").reads("a", "b", "c").build();
-//
-//        Graph graph = GraphBuilder.buildGraph(List.of(a,b,c));
-//
-//        assertThat(graph.inDegree()).containsOnlyKeys("a").hasEntrySatisfying("a", map -> {
-//            assertThat(map).containsEntry("b", 1);
-//            assertThat(map).containsEntry("c", 1);
-//            assertThat(map).doesNotContainKey("a");
-//        });
-//    }
+    @Test
+    void testValidLinearGraph() {
+        Node a = node("a").writes("a", "b").pointsTo("b").build();
+        Node b = node("b").reads("a").writes("b", "c").pointsTo("c").build();
+        Node c = node("c").reads("a", "b", "c").build();
+
+        Graph graph = GraphBuilder.buildGraph(List.of(a,b,c));
+
+        int idA = graph.dict().register("a");
+        int idB = graph.dict().register("b");
+        int idC = graph.dict().register("c");
+
+        assertThat(graph.inDegree()).hasSize(1);
+        assertThat(idA).isEqualTo(0);
+
+        Int2IntOpenHashMap inDegreeForA = graph.inDegree().get(idA);
+
+        assertThat(inDegreeForA)
+                .containsEntry(idB, 1)
+                .containsEntry(idC, 1)
+                .doesNotContainKey(idA);
+    }
 
     @Test
     void testDuplicateNodeNames(){
