@@ -22,14 +22,14 @@ class BranchContext {
 
         for (var currentKey: keyPath){
             TrieNode parent = current;
-            current = current.children.get(currentKey.getKey());
+            current = current.children.get(currentKey.getRawKey());
 
             if (current == null) {
                 current = new TrieNode(contextId, parent.author);
-                parent.children.put(currentKey.getKey(), current);
+                parent.children.put(currentKey.getRawKey(), current);
             } else if (current.contextId != this.contextId) {
                 current = new TrieNode(current, this.contextId);
-                parent.children.put(currentKey.getKey(), current);
+                parent.children.put(currentKey.getRawKey(), current);
             }
             parent.hasWriteDeeper = parent.hasWriteDeeper || isWrite;
             parent.hasReadDeeper = parent.hasReadDeeper || !isWrite;

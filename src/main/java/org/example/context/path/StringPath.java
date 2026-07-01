@@ -1,5 +1,7 @@
 package org.example.context.path;
 
+import org.example.context.path.utils.SymbolTable;
+
 import java.util.Iterator;
 
 public class StringPath implements Iterable<StringPath.Segment> {
@@ -42,7 +44,7 @@ public class StringPath implements Iterable<StringPath.Segment> {
         };
     }
 
-    public static class Segment {
+    public static class Segment implements PathSegment {
         private final String key;
         private final int index;
         private final boolean isIndex;
@@ -59,8 +61,18 @@ public class StringPath implements Iterable<StringPath.Segment> {
             this.isIndex = true;
         }
 
+        @Override
         public boolean isIndex() { return isIndex; }
+
+        @Override
         public int getIndex() { return index; }
-        public String getKey() { return key; }
+
+        @Override
+        public String getStringKey(SymbolTable dict) { return key; }
+
+        @Override
+        public int getIntKey(SymbolTable dict) {
+            return dict.register(this.key);
+        }
     }
 }

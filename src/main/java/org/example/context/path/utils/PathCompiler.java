@@ -1,4 +1,4 @@
-package org.example.graph.internal.utils;
+package org.example.context.path.utils;
 
 import org.example.context.path.IntPath;
 import org.example.context.path.StringPath;

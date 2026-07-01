@@ -4,41 +4,46 @@ import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayFIFOQueue;
-import org.example.graph.CompiledNode;
+import org.example.context.path.utils.SymbolTable;
+import org.example.graph.NodeData;
+import org.example.graph.SubGraph;
 import org.example.graph.exceptions.GraphException;
 import org.example.graph.exceptions.GraphExceptionCode;
 
+import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class GraphValidator {
-    public static void validateKeyUsage(int root, List<CompiledNode> graph, Int2IntOpenHashMap inDegree, int rootCtxId, int sinkNodeId) {
-        Int2IntOpenHashMap inDegreeCopy = new Int2IntOpenHashMap(inDegree);
+    public static void validateKeyUsage(SubGraph subGraph, List<NodeData> nodeData, int rootCtxId) {
+        int[] inDegreeCopy = Arrays.copyOf(subGraph.inDegree(), subGraph.inDegree().length);
         Int2ObjectOpenHashMap<BranchContext> states = new Int2ObjectOpenHashMap<>();
         AtomicInteger lastContextId = new AtomicInteger();
         IntArrayFIFOQueue toVisit = new IntArrayFIFOQueue();
-        toVisit.enqueue(root);
-        states.put(root, new BranchContext(lastContextId.incrementAndGet(), rootCtxId));
-        states.put(sinkNodeId, new BranchContext(lastContextId.incrementAndGet(), rootCtxId));
+        toVisit.enqueue(0);
+        states.put(0, new BranchContext(lastContextId.incrementAndGet(), rootCtxId));
+        BranchContext sinkNodeContext = new BranchContext(lastContextId.incrementAndGet(), rootCtxId);
 
         while (!toVisit.isEmpty()) {
             int nodeName = toVisit.dequeueInt();
-            CompiledNode node = graph.get(nodeName);
+            NodeData node = nodeData.get(subGraph.localToGlobal()[nodeName]);
             BranchContext currentState = states.remove(nodeName);
 
             for (var inKey : node.input()) currentState.setAuthor(inKey.global(), nodeName, false);
             for (var outKey : node.output()) currentState.setAuthor(outKey.global(), nodeName, true);
 
-            if (node.nextSet().isEmpty()) {
-                mergeAndValidateStates(currentState, states.get(sinkNodeId), sinkNodeId);
+            if (subGraph.childrenCount(nodeName) == 0) {
+                mergeAndValidateStates(currentState, sinkNodeContext, nodeName);
                 continue;
             }
 
-            for (int next : node.nextSet()) {
-                if (inDegree.get(next) == 1) {
+            for (Iterator<SubGraph.ChildNode> it = subGraph.childIterator(nodeName); it.hasNext(); ) {
+                int next = it.next().getChild();
+                if (subGraph.inDegree()[next] == 1) {
                     BranchContext newContext;
 
-                    if (node.nextSet().size() == 1) {
+                    if (subGraph.childrenCount(nodeName) == 1) {
                         newContext = currentState;
                     } else {
                         newContext = new BranchContext(currentState, lastContextId.incrementAndGet());
@@ -50,8 +55,8 @@ public class GraphValidator {
                     mergeAndValidateStates(currentState, nextState, next);
                 }
 
-                int newInDegree = inDegreeCopy.get(next) - 1;
-                inDegreeCopy.put(next, newInDegree);
+                int newInDegree = inDegreeCopy[next] - 1;
+                inDegreeCopy[next] = newInDegree;
                 if (newInDegree == 0) toVisit.enqueue(next);
             }
         }
