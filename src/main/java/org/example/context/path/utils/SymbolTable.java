@@ -19,6 +19,10 @@ public class SymbolTable {
         return id;
     }
 
+    public int getInt(String str) {
+        return stringToId.get(str);
+    }
+
     public String getString(int id) {
         return idToString.get(id);
     }

@@ -71,8 +71,8 @@ public class GraphCompiler {
                 if (!globalToLocal.containsKey(next)) {
                     globalToLocal.put(next, localToGlobalList.size());
                     localToGlobalList.add(next);
+                    toVisit.add(new VisitRecord(next, false));
                 }
-                toVisit.add(new VisitRecord(next, false));
             }
         }
 

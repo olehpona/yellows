@@ -4,6 +4,8 @@ import org.example.context.path.utils.SymbolTable;
 
 import java.util.Iterator;
 
+import java.util.NoSuchElementException;
+
 public class IntPath implements Iterable<IntPath.Segment> {
     private final int[] segments;
 
@@ -12,7 +14,11 @@ public class IntPath implements Iterable<IntPath.Segment> {
     }
 
     public class Segment implements PathSegment {
-        private int pos = -1;
+        private final int pos;
+
+        public Segment(int pos) {
+            this.pos = pos;
+        }
 
         @Override
         public boolean isIndex() {
@@ -34,23 +40,29 @@ public class IntPath implements Iterable<IntPath.Segment> {
             return dict.getString(segments[pos]);
         }
 
-        public int getRawKey() { return segments[pos];}
+        public int getRawKey() {
+            return segments[pos];
+        }
     }
 
     @Override
     public Iterator<Segment> iterator() {
         return new Iterator<>() {
-            private final Segment cursor = new Segment();
+            private int currentIndex = 0;
 
             @Override
             public boolean hasNext() {
-                return cursor.pos + 1 < segments.length;
+                return currentIndex < segments.length;
             }
 
             @Override
             public Segment next() {
-                cursor.pos++;
-                return cursor;
+                if (!hasNext()) {
+                    throw new NoSuchElementException();
+                }
+                Segment segment = new Segment(currentIndex);
+                currentIndex++;
+                return segment;
             }
         };
     }

@@ -56,7 +56,7 @@ public class GraphBuilder {
             throw new GraphException(GraphExceptionCode.ERR_LOOP, "Unreachable disconnected loop detected!");
         }
 
-        return new Graph(Arrays.asList(subGraphs), nodeData, dict);
+        return new Graph(Arrays.asList(subGraphs), nodeData, dict, nodeNames);
     }
 
     public static Graph buildGraph(List<Node> nodes) {

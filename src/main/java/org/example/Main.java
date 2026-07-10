@@ -3,6 +3,7 @@ package org.example;
 import org.example.graph.Graph;
 import org.example.graph.GraphBuilder;
 import org.example.graph.Node;
+import org.example.plugins.PluginRegistry;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
@@ -11,12 +12,12 @@ import java.util.*;
 
 public class Main {
     public static void main(String[] args) throws Exception {
-        parse();
+        PluginRegistry reg = new PluginRegistry("");
     }
 
     static void create() {
-        int LAYERS = 1;
-        int NODES_PER_LAYER = 1000000;
+        int LAYERS = 10;
+        int NODES_PER_LAYER = 1000;
 
         Random random = new Random();
         List<Map<String, Object>> graph = new ArrayList<>();

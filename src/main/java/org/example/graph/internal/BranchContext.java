@@ -66,7 +66,7 @@ class BranchContext {
             TrieNode sourceChild = entry.getValue();
             TrieNode currentChild = current.children.get(key);
 
-            if (currentChild == sourceChild) return;
+            if (currentChild == sourceChild) continue;
 
             if (currentChild == null) {
                 current.children.put(key, sourceChild);

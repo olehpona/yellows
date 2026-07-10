@@ -2,7 +2,7 @@ package org.example.graph.internal;
 
 public class TrieNode {
     public int author;
-    public final ChildrenContainer children;
+    public ChildrenContainer children;
     public boolean isExplicit;
     public final int contextId;
 

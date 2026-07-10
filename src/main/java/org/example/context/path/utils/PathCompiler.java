@@ -12,9 +12,9 @@ public class PathCompiler {
             String p = parts[i];
             if (p.startsWith("[") && p.endsWith("]")) {
                 int index = Integer.parseInt(p.substring(1, p.length() - 1));
-                segments[i] = index | 0x80000000; // MSB для масиву
+                segments[i] = index | 0x80000000;
             } else {
-                segments[i] = dict.register(p);   // Реєструємо строк
+                segments[i] = dict.register(p);
             }
         }
         return new IntPath(segments);

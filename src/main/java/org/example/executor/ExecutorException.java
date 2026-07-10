@@ -1,7 +1,13 @@
 package org.example.executor;
 
 public class ExecutorException extends RuntimeException {
-    public ExecutorException(ExecutorExceptionCode errCode, String message) {
-        super(String.format("[%s]. %s", errCode.toString(),message));
+    private final ExecutorExceptionCode exceptionCode;
+    public ExecutorException(ExecutorExceptionCode code, String message) {
+        exceptionCode = code;
+        super(String.format("[%s]. %s", code.toString(),message));
+    }
+
+    public ExecutorExceptionCode getExceptionCode() {
+        return exceptionCode;
     }
 }

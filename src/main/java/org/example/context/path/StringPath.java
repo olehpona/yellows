@@ -72,7 +72,7 @@ public class StringPath implements Iterable<StringPath.Segment> {
 
         @Override
         public int getIntKey(SymbolTable dict) {
-            return dict.register(this.key);
+            return dict.getInt(this.key);
         }
     }
 }

@@ -1,6 +1,5 @@
 package org.example.graph;
 
-import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import org.example.graph.exceptions.GraphException;
 import org.example.graph.exceptions.GraphExceptionCode;
 import org.junit.jupiter.api.Test;
@@ -44,25 +43,29 @@ public class GraphBuilderTest {
 
     @Test
     void testValidLinearGraph() {
-//        Node a = node("a").writes("a", "b").pointsTo("b").build();
-//        Node b = node("b").reads("a").writes("b", "c").pointsTo("c").build();
-//        Node c = node("c").reads("a", "b", "c").build();
-//
-//        Graph graph = GraphBuilder.buildGraph(List.of(a,b,c));
-//
-//        int idA = graph.dict().register("a");
-//        int idB = graph.dict().register("b");
-//        int idC = graph.dict().register("c");
-//
-//        assertThat(graph.inDegree()).hasSize(1);
-//        assertThat(idA).isEqualTo(0);
-//
-//        Int2IntOpenHashMap inDegreeForA = graph.inDegree().get(idA);
-//
-//        assertThat(inDegreeForA)
-//                .containsEntry(idB, 1)
-//                .containsEntry(idC, 1)
-//                .doesNotContainKey(idA);
+        Node a = node("a").writes("a", "b").pointsTo("b").build();
+        Node b = node("b").reads("a").writes("b", "c").pointsTo("c").build();
+        Node c = node("c").reads("a", "b", "c").build();
+
+        Graph graph = GraphBuilder.buildGraph(List.of(a,b,c));
+
+        int idA = graph.nodeNames().getInt("a");
+        int idB = graph.nodeNames().getInt("b");
+        int idC = graph.nodeNames().getInt("c");
+
+        assertThat(graph.subGraphs()).hasSize(1);
+        assertThat(graph.nodes()).hasSize(3);
+
+        var subGraph = graph.subGraphs().getFirst();
+
+        assertThat(subGraph.inDegree()).hasSize(3);
+        assertThat(subGraph.inDegree()[0]).isEqualTo(0);
+        assertThat(subGraph.inDegree()[1]).isEqualTo(1);
+        assertThat(subGraph.inDegree()[2]).isEqualTo(1);
+
+        assertThat(subGraph.localToGlobal()[0]).isEqualTo(idA);
+        assertThat(subGraph.localToGlobal()[1]).isEqualTo(idB);
+        assertThat(subGraph.localToGlobal()[2]).isEqualTo(idC);
     }
 
     @Test

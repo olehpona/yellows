@@ -2,6 +2,7 @@ package org.example.context;
 
 import org.example.context.path.PathSegment;
 import org.example.context.path.utils.SymbolTable;
+import org.example.context.values.MissingValue;
 
 public abstract class ReadContextValue {
     public String asString(String def)      { return def; }
@@ -22,13 +23,15 @@ public abstract class ReadContextValue {
     public double asDouble(double def)      { return def; }
     public boolean isDouble()               { return false; }
 
-    public boolean isMissing()              { return this == ContextValue.MissingValue.INSTANCE; }
+    public boolean isMissing()              { return this == MissingValue.INSTANCE; }
+    public boolean isObject()               { return false; }
+    public boolean isArray()                { return false; }
 
     public ReadContextValue getChild(PathSegment token, SymbolTable dict) {
-        return ContextValue.MissingValue.INSTANCE;
+        return MissingValue.INSTANCE;
     }
 
-    public final ReadContextValue resolvePath(Iterable<PathSegment> path, SymbolTable dict) {
+    public final <T extends PathSegment> ReadContextValue resolvePath(Iterable<T> path, SymbolTable dict) {
         ReadContextValue current = this;
         for (PathSegment segment : path) {
             current = current.getChild(segment, dict);
@@ -37,5 +40,9 @@ public abstract class ReadContextValue {
             }
         }
         return current;
+    }
+
+    public ReadContextValue deepCopy() {
+        return this;
     }
 }
