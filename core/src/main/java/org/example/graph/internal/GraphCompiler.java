@@ -47,7 +47,7 @@ public class GraphCompiler {
         IntArrayList localToGlobalList = new IntArrayList();
         IntOpenHashSet inProcess = new IntOpenHashSet();
 
-        record VisitRecord(int node, boolean isOut){};
+        record VisitRecord(int node, boolean isOut){}
         List<VisitRecord> toVisit = new ArrayList<>();
 
         globalToLocal.put(root, 0);
@@ -67,6 +67,10 @@ public class GraphCompiler {
             }
 
             toVisit.add(new VisitRecord(node.node(), true));
+            int nodeId = node.node();
+            if (nodeId >= graph.size()) {
+                throw new GraphException(GraphExceptionCode.ERR_UNKNOWN_NODE, "Next node is not defined");
+            }
             for (int next: graph.get(node.node()).next()) {
                 if (!globalToLocal.containsKey(next)) {
                     globalToLocal.put(next, localToGlobalList.size());
@@ -122,6 +126,10 @@ public class GraphCompiler {
             SymbolTable localNodeNames = new SymbolTable();
             List<String> roots = GraphAnalyzer.findRoots(rawNodes);
 
+            if (roots.size() > 1) {
+                throw new GraphException(GraphExceptionCode.ERR_BAD_ROUTINE, "Routine must contain one root");
+            }
+
             List<CompiledNode> compiledNodes = compileNodes(rawNodes, localNodeNames, dict, roots, routineNames);
 
             int routineOffset = globalNodeData.size();
@@ -129,14 +137,10 @@ public class GraphCompiler {
                 globalNodeData.add(new NodeData(cn));
             }
 
-            SubGraph[] routineSubGraphs = new SubGraph[roots.size()];
-            int i = 0;
-            for (String root : roots) {
-                int rootId = localNodeNames.getInt(root);
-                routineSubGraphs[i++] = buildSubGraph(rootId, compiledNodes, routineOffset);
-            }
+            int rootId = localNodeNames.getInt(roots.getFirst());
+            SubGraph subGraph = buildSubGraph(rootId, compiledNodes, routineOffset);
 
-            compiled[routineId] = new RoutineData(routineSubGraphs, localNodeNames);
+            compiled[routineId] = new RoutineData(subGraph, localNodeNames);
         }
 
         return compiled;

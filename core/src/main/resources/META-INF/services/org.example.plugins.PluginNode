@@ -1,0 +1,9 @@
+org.example.plugins.builtin.Print
+org.example.plugins.builtin.If
+org.example.plugins.builtin.Format
+org.example.plugins.builtin.Delete
+org.example.plugins.builtin.Noop
+org.example.plugins.builtin.math.Add
+org.example.plugins.builtin.math.Subtract
+org.example.plugins.builtin.math.Multiply
+org.example.plugins.builtin.math.Divide

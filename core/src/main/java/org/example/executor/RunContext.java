@@ -11,6 +11,7 @@ import org.example.graph.SubGraph;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicIntegerArray;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class RunContext {
@@ -20,6 +21,7 @@ public class RunContext {
     private final List<NodeData> nodeData;
     private final SymbolTable dict;
     private final SymbolTable nodeDict;
+    private final AtomicReference<Throwable> killReason = new AtomicReference<>(null);
 
     private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
 
@@ -31,7 +33,7 @@ public class RunContext {
 
         AtomicIntegerArray inDegreeCopy = new AtomicIntegerArray(other.inDegree.length());
 
-        lock.writeLock().lock();
+        other.lock.writeLock().lock();
         try {
             for (int i =0; i< other.inDegree.length(); i++) {
                 inDegreeCopy.set(i, other.inDegree.get(i));
@@ -160,5 +162,17 @@ public class RunContext {
                 }
             }
         }
+    }
+
+    public void kill(Throwable t){
+        killReason.compareAndSet(null, t);
+    }
+
+    public Throwable getKillReason() {
+        return killReason.get();
+    }
+
+    public boolean isKilled(){
+        return killReason.get() != null;
     }
 }

@@ -5,6 +5,7 @@ import org.example.context.path.utils.SymbolTable;
 import org.example.context.values.scalar.*;
 
 public class PluginWriteWrapper {
+    private static final PluginWriteWrapper MISSING = new PluginWriteWrapper(null);
     private static final SymbolTable dict = new SymbolTable();
     private SymbolTable overrideDict = null;
     private final WriteContextValue val;
@@ -29,7 +30,7 @@ public class PluginWriteWrapper {
     }
 
     public static PluginWriteWrapper getMissing() {
-        return new PluginWriteWrapper(null);
+        return MISSING;
     }
 
     public void putPath(String path, PluginReadWrapper wrapper) {
@@ -40,6 +41,9 @@ public class PluginWriteWrapper {
     }
 
     public void putPath(String path, ReadContextValue value) {
+        if (val == null) {
+            throw new UnsupportedOperationException("Can not write into missing value");
+        }
         val.putPath(StringPath.fromString(path), getDict(), value);
     }
 

@@ -5,7 +5,6 @@ import org.example.context.path.StringPath;
 import org.example.context.path.utils.SymbolTable;
 import org.example.graph.NodeData;
 import org.example.graph.RoutineData;
-import org.example.graph.SubGraph;
 import org.example.plugins.PluginCallback;
 import org.example.plugins.PluginNode;
 import org.example.plugins.PluginRegistry;
@@ -14,6 +13,7 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Phaser;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class Executor {
     private final PluginRegistry registry;
@@ -41,6 +41,10 @@ public class Executor {
         NodeData data = nodeData.get(ctx.getGlobalNodeId(nodeId));
 
         executorService.submit(() -> {
+            if (ctx.isKilled()) {
+                phaser.arriveAndDeregister();
+                return;
+            }
             try {
                 if (data.isRoutine()) {
                     executeRoutine(ctx, nodeId, data, phaser);
@@ -49,6 +53,7 @@ public class Executor {
                 }
             } catch (Throwable t) {
                 t.printStackTrace();
+                ctx.kill(t);
                 phaser.arriveAndDeregister();
             }
         });
@@ -77,66 +82,89 @@ public class Executor {
 
         RoutineData meta = this.routineData.get(data.routine());
 
-        for (SubGraph subGraph: meta.subGraphs()) {
-            RunContext routineCtx = new RunContext(routineRoot, subGraph, nodeData, dict, meta.nodeNames());
+        Phaser routinePhaser = new Phaser(1);
 
-            Phaser routinePhaser = new Phaser(1);
+        RunContext routineCtx = new RunContext(routineRoot, meta.subGraph(), nodeData, dict, meta.nodeNames());
 
-            spawnNode(routineCtx, 0, routinePhaser);
+        spawnNode(routineCtx, 0, routinePhaser);
 
-            routinePhaser.arriveAndAwaitAdvance();
+        routinePhaser.arriveAndAwaitAdvance();
 
-            PluginWriteWrapper routineResult = EngineContextBridge.wrap(localState);
+        PluginWriteWrapper routineResult = EngineContextBridge.wrap(localState);
 
-            PluginCallback cb = createCallback(ctx, nodeId, parentPhaser);
-            cb.completeAndReturn(routineResult, List.of());
+        PluginCallback cb = createCallback(ctx, nodeId, parentPhaser);
+        if (routineCtx.isKilled()) {
+            cb.fail(routineCtx.getKillReason());
+            return;
         }
+        cb.completeAndReturn(routineResult, List.of());
     }
 
     private PluginCallback createCallback(RunContext ctx, int nodeId, Phaser phaser) {
         return new PluginCallback() {
+            private final AtomicBoolean isFinished = new AtomicBoolean(false);
             @Override
             public void completeAndReturn(PluginWriteWrapper output, List<String> hints) {
+                if (!isFinished.compareAndSet(false, true)) {
+                    throw new IllegalStateException("Plugin tried to finish twice!");
+                }
+
+                if (ctx.isKilled()) {
+                    phaser.arriveAndDeregister();
+                    return;
+                }
+
                 try {
                     int[] nextNodes = ctx.mergeOutput(nodeId, EngineContextBridge.unwrap(output), hints);
                     for (int nextNode: nextNodes) {
                         spawnNode(ctx, nextNode, phaser);
                     }
-                } finally {
                     phaser.arriveAndDeregister();
+                } catch (Throwable t) {
+                    fail(t);
                 }
             }
 
             @Override
             public void completeAndSpawn(PluginWriteWrapper output, List<String> hints) {
+                if (isFinished.get()) {
+                    throw new IllegalStateException("Cannot spawn after completeAndReturn or fail!");
+                }
+
+                if (ctx.isKilled()) {
+                    throw new IllegalStateException("RunContext is killed");
+                }
+
                 try {
                     var newCtx = new RunContext(ctx);
                     int[] nextNodes = newCtx.mergeOutput(nodeId, EngineContextBridge.unwrap(output), hints);
                     for (int nextNode: nextNodes) {
                         spawnNode(newCtx, nextNode, phaser);
                     }
-                } finally {
-                    phaser.arriveAndDeregister();
+                } catch (Throwable t) {
+                    fail(t);
                 }
             }
 
             @Override
             public void fail(Throwable t) {
+                if (!isFinished.compareAndSet(false, true)) {
+                    throw new IllegalStateException("Plugin tried to finish twice!");
+                }
+
+                if (ctx.isKilled()) {
+                    phaser.arriveAndDeregister();
+                    return;
+                }
+
                 try {
                     t.printStackTrace();
+                    ctx.kill(t);
                 } finally {
                     phaser.arriveAndDeregister();
                 }
             }
         };
-    }
-
-    public static void pluginWrapper(PluginNode plugin, PluginReadWrapper context, PluginCallback cb) {
-        try {
-            plugin.execute(context, cb);
-        } catch (RuntimeException e) {
-            cb.fail(e);
-        }
     }
 
     public void waitAll() {

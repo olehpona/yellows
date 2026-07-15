@@ -54,10 +54,8 @@ public class GraphBuilder {
             for (RoutineData meta : routinesData) {
                 int routineRootCtx = meta.nodeNames().register(ROOT_AUTHOR);
 
-                for (SubGraph subGraph : meta.subGraphs()) {
-                    futures.add(CompletableFuture.runAsync(() ->
-                            GraphValidator.validateKeyUsage(subGraph, nodeData, routineRootCtx), executor));
-                }
+                futures.add(CompletableFuture.runAsync(() ->
+                        GraphValidator.validateKeyUsage(meta.subGraph(), nodeData, routineRootCtx), executor));
             }
 
             try {

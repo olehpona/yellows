@@ -10,7 +10,7 @@ Yellows is a pipeline engine powered by a directed acyclic graph ( DAG ). Built 
 
 ## Tech
 * **Java 25**
-* **fastutils**
+* **fastutil**
 * **Jackson**
 * **JUnit**
 * **Mockito**
@@ -93,17 +93,13 @@ To start using you only need run config in JSON format. For now, it looks like t
 * Const don't map into routines context
 
 ## Plugins
-Yellows supports loading external .jar plugins, but they should match requirements
-* Class should be marked with Plugin annotation where will be defined plugin id and scope ( Singleton ( Shared )/ Per request)
-* Class should not be abstract or interface
-* Class should implement PluginNode interface
-* Class should have public no args constructor
-* Jar resources should have *plugin.txt* where in each line will be defined plugin class where plugin will be searched, example:
-```txt
-org.example.MyPluginClass1
-org.example.MyPluginClass2
-```
-* Incorrect plugin will stop all execution with the corresponding error
+Yellows supports loading external `.jar` plugins, provided they meet the following requirements:
+* The class must be annotated with `@Plugin`, defining its unique `id` and `scope` (Singleton/Shared or Per Request).
+* The class must implement the `PluginNode` interface.
+* The class must be concrete (not abstract or an interface).
+* The class must have a public no-args constructor.
+* Plugin discovery is powered by standard Java SPI.
+* Fail-fast: Loading an incorrect or broken plugin will halt all execution with a corresponding fatal error.
 
 Note
 * Default plugin scope is shared
@@ -114,6 +110,7 @@ Note
 * `builtin.if`: inputs - `a_name`, `b_name`, `condition`, outputs -
 * `builtin.format`: inputs - `format_string`, `values`, outputs - `result`
 * `builtin.delete`: inputs - `key`, outputs - 
+* `builtin.noop`: inputs - , outputs -
 * `builtin.math.add`: inputs - `a`, `b`, outputs - `out`
 * `builtin.math.subtract`: inputs - `a`, `b`, outputs - `out`
 * `builtin.math.multiply`: inputs - `a`, `b`, outputs - `out`
@@ -148,4 +145,6 @@ It is worth mentioning the implementation of node state storage in `inDegree`, s
 *Unfortunately, despite the bold claims of a “lock-free” run context, it is not actually lock-free; it must synchronize during copying, since it is not possible to safely copy both the context and inDegree. But this is only the case when trigger spawns new run context.
 ### Routines
 Think about routines as independent runs of subgraph. Each routine define its own `RunContext` which allows it to be completely independent as in context as in using node names.  
-Be aware that all context in `in` branch are immutable and will only be shadowed by any changes.
+Be aware that all context in `in` branch are immutable and will only be shadowed by any changes.  
+Note
+* Each routine mush have only one root, because of impossibility ( in current architecture ) to detected WriteWrite conflict when merging its sub graph, if you want to start parallel branches from start please use `builtin.noop`
