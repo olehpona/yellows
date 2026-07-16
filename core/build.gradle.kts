@@ -1,6 +1,7 @@
 plugins {
     id("java")
     jacoco
+    id("com.gradleup.shadow") version "9.5.1"
 }
 
 dependencies {
