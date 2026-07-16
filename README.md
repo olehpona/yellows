@@ -10,13 +10,33 @@ Yellows is a pipeline engine powered by a directed acyclic graph ( DAG ). Built 
 
 ## Tech
 * **Java 25**
+* **SLF4J**
+* **Logback**
+* **Picocli**
 * **fastutil**
 * **Jackson**
 * **JUnit**
 * **Mockito**
 
-## Install and run
-in near future
+## Components
+* **CLI** Simple cli to run user pipelines
+* **Core** Engine components
+* **Api** Plugin api
+
+## Build and run
+### Build
+To build cli run
+```shell
+./gradlew :cli:shadowJar
+```
+### Run
+Run downloaded or builded jar
+```shell
+java -jar cli.jar your_path_to_config.json
+```
+Node
+* In the same dir must be created plugin directory for external plugins
+* -s / --skipValidation flag can be used to disable race condition validation
 
 ## Usage
 To start using you only need run config in JSON format. For now, it looks like this

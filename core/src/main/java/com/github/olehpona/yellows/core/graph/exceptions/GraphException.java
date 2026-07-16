@@ -1,0 +1,13 @@
+package com.github.olehpona.yellows.core.graph.exceptions;
+
+public class GraphException extends RuntimeException {
+    private final GraphExceptionCode exceptionCode;
+    public GraphException(GraphExceptionCode code, String message) {
+        exceptionCode = code;
+        super(String.format("[%s]. %s", code.toString(), message));
+    }
+
+    public GraphExceptionCode getExceptionCode() {
+        return exceptionCode;
+    }
+}

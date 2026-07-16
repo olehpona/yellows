@@ -1,0 +1,14 @@
+<configuration>
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %highlight(%-5level) %cyan(%logger{36}) - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <root level="WARN">
+        <appender-ref ref="STDOUT" />
+    </root>
+
+    <!-- Якщо хочеш сховати логи від сторонніх ліб (наприклад fastutil), роби так: -->
+    <!-- <logger name="it.unimi.dsi" level="INFO" /> -->
+</configuration>

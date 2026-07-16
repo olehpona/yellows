@@ -1,0 +1,9 @@
+com.github.olehpona.yellows.core.plugins.builtin.Print
+com.github.olehpona.yellows.core.plugins.builtin.If
+com.github.olehpona.yellows.core.plugins.builtin.Format
+com.github.olehpona.yellows.core.plugins.builtin.Delete
+com.github.olehpona.yellows.core.plugins.builtin.Noop
+com.github.olehpona.yellows.core.plugins.builtin.math.Add
+com.github.olehpona.yellows.core.plugins.builtin.math.Subtract
+com.github.olehpona.yellows.core.plugins.builtin.math.Multiply
+com.github.olehpona.yellows.core.plugins.builtin.math.Divide
