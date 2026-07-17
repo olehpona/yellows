@@ -64,6 +64,7 @@ public class Main implements Callable<Integer> {
             executor.spawnNode(ctx, 0);
         }
         executor.waitAll();
+        executor.shutdown();
 
         return 0;
     }

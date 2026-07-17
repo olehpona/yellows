@@ -1,0 +1,59 @@
+{
+  "nodes": [
+    {
+      "name" : "print-start",
+      "plugin": "builtin.print",
+      "input" : { "out" : "const.start" },
+      "output" : {},
+      "next" : ["hello-user"]
+    },
+    {
+      "name": "hello-user",
+      "routine": "print-formated",
+      "input": {
+        "format": "const.format",
+        "name" : "const.who"
+      },
+      "output": {},
+      "next": ["print-end"]
+    },
+    {
+      "name" : "print-end",
+      "plugin": "builtin.print",
+      "input" : { "out" : "const.end" },
+      "output" : {},
+      "next" : []
+    }
+  ],
+  "constants" : {
+    "format": "Hello %s!!!",
+    "who": "world",
+    "start" : "Start",
+    "end": "End"
+  },
+  "routines": {
+    "print-formated": [
+      {
+        "name": "format",
+        "plugin": "builtin.format",
+        "input": {
+          "format_string": "in.format",
+          "values.[0]": "in.name"
+        },
+        "output": {
+          "result": "result"
+        },
+        "next": ["print"]
+      },
+      {
+        "name": "print",
+        "plugin": "builtin.print",
+        "input" : {
+          "out": "result"
+        },
+        "output": {},
+        "next": []
+      }
+    ]
+  }
+}

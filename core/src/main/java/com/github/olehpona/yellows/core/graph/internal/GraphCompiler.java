@@ -116,10 +116,14 @@ public class GraphCompiler {
 
         RoutineData[] compiled = new RoutineData[rawRoutines.size()];
 
+        for (String routineName : rawRoutines.keySet()) {
+            routineNames.register(routineName);
+        }
+
         for (Map.Entry<String, List<Node>> entry : rawRoutines.entrySet()) {
             String routineName = entry.getKey();
             List<Node> rawNodes = entry.getValue();
-            int routineId = routineNames.register(routineName);
+            int routineId = routineNames.getInt(routineName);
 
             SymbolTable localNodeNames = new SymbolTable();
             List<String> roots = GraphAnalyzer.findRoots(rawNodes);

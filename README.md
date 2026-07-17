@@ -23,6 +23,28 @@ Yellows is a pipeline engine powered by a directed acyclic graph ( DAG ). Built 
 * **Core** Engine components
 * **Api** Plugin api
 
+## Benchmarks
+Test device: MacBook Air M4 (10-core CPU, 24GB RAM), macOS 26.5.2  
+Note: Each executor benchmark created 10 nodes pipeline
+
+| Benchmark                                  | Score                  | Units | alloc rate norm   | Units |
+|:-------------------------------------------|:-----------------------|:------|:------------------|:------|
+| ExecutorBenchmark.testContextPipeline      | 131600,012 ± 6466,444  | ops/s | 4264,915 ± 11,554 | B/op  |
+| ExecutorBenchmark.testDeepNesting          | 136577,237 ± 18455,115 | ops/s | 8855,626 ± 3,031  | B/op  |
+| ExecutorBenchmark.testExceptionPropagation | 130333,903 ± 4013,168  | ops/s | 5399,994 ± 0,006  | B/op  |
+| ExecutorBenchmark.testHighContention       | 83788,905 ± 560,966    | ops/s | 8016,785 ± 90,972 | B/op  |
+| ExecutorBenchmark.testNoopFanout           | 95285,191 ± 11247,116  | ops/s | 6720,066 ± 0,107  | B/op  |
+| ExecutorBenchmark.testNoopPipeline         | 157728,587 ± 5137,322  | ops/s | 2975,988 ± 0,008  | B/op  |
+| ExecutorBenchmark.testRoutineFanoutSpawn   | 85838,103 ± 7077,527   | ops/s | 12744,270 ± 0,081 | B/op  |
+| ExecutorBenchmark.testRoutineSpawn         | 147234,640 ± 12015,718 | ops/s | 10735,928 ± 0,553 | B/op  |
+
+Note: Each graph builder benchmark created graph 10 layer, 1000 nodes and onfigured with zero warmup and a single iteration to accurately measure realistic cold-start performance
+
+| Benchmark                                   | Score | Units | alloc rate norm | Units |
+|:--------------------------------------------|:------|:------|:----------------|:------|
+| GraphBuilderBenchmark.testWithValidation    | 1,552 | s/op  | 128010280,000   | B/op  |
+| GraphBuilderBenchmark.testWithoutValidation | 0,084 | s/op  | 118521376,000   | B/op  |
+
 ## Build and run
 ### Build
 To build cli run
@@ -34,7 +56,7 @@ Run downloaded or builded jar
 ```shell
 java -jar cli.jar your_path_to_config.json
 ```
-Node
+Note:
 * In the same dir must be created plugin directory for external plugins
 * -s / --skipValidation flag can be used to disable race condition validation
 
@@ -121,9 +143,7 @@ Yellows supports loading external `.jar` plugins, provided they meet the followi
 * Plugin discovery is powered by standard Java SPI.
 * Fail-fast: Loading an incorrect or broken plugin will halt all execution with a corresponding fatal error.
 
-Note
-* Default plugin scope is shared
-* The best way to create trigger node is to use *completeAndSpawn* callback that will copy context and start and will allow this node to continue executing safely. Calling completeAndReturn more than once is not recommended, because it may trigger inner graph corruption (execution will be stopped) or future silent context corruption (both will be fixed in near future with implementation of fail fast double return detection)
+For more details [Plugins docs](api/README.md)
 
 ### Built in plugins
 * `builtin.print`: inputs - `out`, outputs -
@@ -135,6 +155,12 @@ Note
 * `builtin.math.subtract`: inputs - `a`, `b`, outputs - `out`
 * `builtin.math.multiply`: inputs - `a`, `b`, outputs - `out`
 * `builtin.math.divide`: inputs - `a`, `b`, outputs - `out`
+
+## What next
+* More test
+* Builtin plugins for logical operations
+* External plugins collection for io operations
+* Observability
 
 ## Some boring implementation details
 Graph compilation is a process that can be divided into two key stages: 1—optimization; 2—validation

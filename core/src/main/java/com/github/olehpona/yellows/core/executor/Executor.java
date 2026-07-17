@@ -14,7 +14,6 @@ import com.github.olehpona.yellows.core.executor.exceptions.ExecutorExceptionCod
 import com.github.olehpona.yellows.core.executor.exceptions.NodeException;
 import com.github.olehpona.yellows.core.graph.NodeData;
 import com.github.olehpona.yellows.core.graph.RoutineData;
-import com.github.olehpona.yellows.api.plugins.PluginCallback;
 import com.github.olehpona.yellows.api.plugins.PluginNode;
 import com.github.olehpona.yellows.core.plugins.PluginRegistry;
 import org.slf4j.Logger;
@@ -49,33 +48,45 @@ public class Executor {
     public void spawnNode(RunContext ctx, int nodeId, Phaser phaser) {
         phaser.register();
 
-        NodeData data = nodeData.get(ctx.getGlobalNodeIndex(nodeId));
-
         executorService.submit(() -> {
-            if (ctx.isKilled()) {
-                phaser.arriveAndDeregister();
-                return;
-            }
-            try {
-                if (data.isRoutine()) {
-                    executeRoutine(ctx, nodeId, data, phaser);
-                } else {
-                    executePlugin(ctx, nodeId, data, phaser);
-                }
-            } catch (Throwable t) {
-                if (ctx.kill(new NodeException(ctx.getTrace(nodeId), t))) {
-                    logger.error(buildBeautifulErrorTrace(ctx.getKillReason()));
-                }
-                phaser.arriveAndDeregister();
-            }
+            spawn(ctx, this, nodeId, phaser);
         });
     }
 
-    private void executePlugin(RunContext ctx, int nodeId, NodeData data, Phaser phaser) {
+    private static void spawn(RunContext ctx, Executor executor,int nodeId, Phaser phaser) {
+        if (ctx.isKilled()) {
+            phaser.arriveAndDeregister();
+            return;
+        }
+        try {
+            while (true) {
+                NodeData data = executor.nodeData.get(ctx.getGlobalNodeIndex(nodeId));
+                CorePluginCallback cb = new CorePluginCallback(ctx, executor, phaser, nodeId);
+
+                if (data.isRoutine()) {
+                    executor.executeRoutine(ctx, nodeId, data, phaser, cb);
+                } else {
+                    executor.executePlugin(ctx, nodeId, data, phaser, cb);
+                }
+
+                if (cb.getNextInlineNode() >= 0) {
+                    nodeId = cb.getNextInlineNode();
+                } else {
+                    break;
+                }
+            }
+        } catch (Throwable t) {
+            if (ctx.kill(new NodeException(ctx.getTrace(nodeId), t))) {
+                logger.error(buildBeautifulErrorTrace(ctx.getKillReason()));
+            }
+        } finally {
+            phaser.arriveAndDeregister();
+        }
+    }
+
+    void executePlugin(RunContext ctx, int nodeId, NodeData data, Phaser phaser, CorePluginCallback cb) {
         PluginReadWrapper context = new CorePluginReadWrapper(ctx.buildInputContext(nodeId, ContextSupplier.getStringObject()), dict);
         PluginNode plugin = registry.getPlugin(data.plugin());
-
-        CorePluginCallback cb = new CorePluginCallback(ctx, this, phaser, nodeId);
 
         try {
             plugin.execute(context, cb);
@@ -88,7 +99,7 @@ public class Executor {
         }
     }
 
-    private void executeRoutine(RunContext ctx, int nodeId, NodeData data, Phaser parentPhaser) {
+    private void executeRoutine(RunContext ctx, int nodeId, NodeData data, Phaser parentPhaser, CorePluginCallback cb) {
         var inputArgs = ctx.buildInputContext(nodeId, ContextSupplier.getStringObject());
 
         var localState = ContextSupplier.getStringObject();
@@ -99,6 +110,7 @@ public class Executor {
         RoutineData meta = this.routineData.get(data.routine());
 
         Phaser routinePhaser = new Phaser(1);
+        routinePhaser.register();
 
         RunContext routineCtx = new RunContext(routineRoot, meta.subGraph(), nodeData, dict, meta.nodeNames());
 
@@ -106,13 +118,12 @@ public class Executor {
             logger.info("Routine {} at {} spawned context {}", meta.name(), ctx.getTrace(nodeId), routineCtx.getContextId());
         }
 
-        spawnNode(routineCtx, 0, routinePhaser);
+        spawn(routineCtx, this,0, routinePhaser);
 
         routinePhaser.arriveAndAwaitAdvance();
 
         PluginWriteWrapper routineResult = new CorePluginWriteWrapper(localState);
 
-        PluginCallback cb = new CorePluginCallback(ctx, this, parentPhaser, nodeId);
         if (routineCtx.isKilled()) {
             cb.fail(new NodeException(
                     "routine [" + meta.name() + "]",
@@ -123,11 +134,11 @@ public class Executor {
     }
 
     public void waitAll() {
-        try {
-            phaser.arriveAndAwaitAdvance();
-        } finally {
-            executorService.close();
-        }
+        phaser.arriveAndAwaitAdvance();
+    }
+
+    public void shutdown() {
+        executorService.shutdown();
     }
 
     static String buildBeautifulErrorTrace(Throwable t) {

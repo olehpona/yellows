@@ -17,6 +17,7 @@ public class CorePluginCallback implements PluginCallback {
     private final Phaser phaser;
     private final int nodeId;
     private final Executor executor;
+    private int nextInlineNode = -1;
     private static final Logger logger = LoggerFactory.getLogger(CorePluginCallback.class);
 
     public CorePluginCallback(RunContext ctx, Executor executor, Phaser phaser, int nodeId) {
@@ -37,16 +38,18 @@ public class CorePluginCallback implements PluginCallback {
         }
 
         if (ctx.isKilled()) {
-            phaser.arriveAndDeregister();
             return;
         }
 
         try {
             int[] nextNodes = ctx.mergeOutput(nodeId, CorePluginWriteWrapper.unwrap(output), hints);
-            for (int nextNode: nextNodes) {
-                executor.spawnNode(ctx, nextNode, phaser);
+            if (nextNodes.length == 0) {
+                return;
             }
-            phaser.arriveAndDeregister();
+            this.nextInlineNode = nextNodes[0];
+            for (int i =1; i< nextNodes.length; i++) {
+                executor.spawnNode(ctx, nextNodes[i], phaser);
+            }
         } catch (Throwable t) {
             fail(t);
         }
@@ -83,16 +86,15 @@ public class CorePluginCallback implements PluginCallback {
         }
 
         if (ctx.isKilled()) {
-            phaser.arriveAndDeregister();
             return;
         }
 
-        try {
-            if (ctx.kill(new NodeException(ctx.getTrace(nodeId), t))) {
-                logger.error(Executor.buildBeautifulErrorTrace(ctx.getKillReason()));
-            }
-        } finally {
-            phaser.arriveAndDeregister();
+        if (ctx.kill(new NodeException(ctx.getTrace(nodeId), t))) {
+            logger.error(Executor.buildBeautifulErrorTrace(ctx.getKillReason()));
         }
+    }
+
+    public int getNextInlineNode() {
+        return nextInlineNode;
     }
 }
