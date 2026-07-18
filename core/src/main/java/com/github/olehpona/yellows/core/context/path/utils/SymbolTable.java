@@ -6,8 +6,17 @@ import java.util.List;
 import java.util.Map;
 
 public class SymbolTable {
-    private final Map<String, Integer> stringToId = new HashMap<>();
-    private final List<String> idToString = new ArrayList<>();
+    private final Map<String, Integer> stringToId;
+    private final List<String> idToString;
+
+    public SymbolTable() {
+        stringToId = new HashMap<>();
+        idToString = new ArrayList<>();
+    }
+    public SymbolTable(int size) {
+        stringToId = new HashMap<>(size);
+        idToString = new ArrayList<>(size);
+    }
 
     public int register(String str) {
         Integer id = stringToId.get(str);

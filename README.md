@@ -22,6 +22,7 @@ Yellows is a pipeline engine powered by a directed acyclic graph ( DAG ). Built 
 * **CLI** Simple cli to run user pipelines
 * **Core** Engine components
 * **Api** Plugin api
+* **Benchmarks**
 
 ## Benchmarks
 Test device: MacBook Air M4 (10-core CPU, 24GB RAM), macOS 26.5.2  
@@ -38,12 +39,12 @@ Note: Each executor benchmark created 10 nodes pipeline
 | ExecutorBenchmark.testRoutineFanoutSpawn   | 85838,103 ± 7077,527   | ops/s | 12744,270 ± 0,081 | B/op  |
 | ExecutorBenchmark.testRoutineSpawn         | 147234,640 ± 12015,718 | ops/s | 10735,928 ± 0,553 | B/op  |
 
-Note: Each graph builder benchmark created graph 10 layer, 1000 nodes and onfigured with zero warmup and a single iteration to accurately measure realistic cold-start performance
+Note: Each graph builder benchmark created graph 10 layer, 1000 nodes per layer and configured with zero warmup and a single iteration to accurately measure realistic cold-start performance
 
 | Benchmark                                   | Score | Units | alloc rate norm | Units |
 |:--------------------------------------------|:------|:------|:----------------|:------|
-| GraphBuilderBenchmark.testWithValidation    | 1,552 | s/op  | 128010280,000   | B/op  |
-| GraphBuilderBenchmark.testWithoutValidation | 0,084 | s/op  | 118521376,000   | B/op  |
+| GraphBuilderBenchmark.testWithValidation    | 1,460 | s/op  | 80359552,000    | B/op  |
+| GraphBuilderBenchmark.testWithoutValidation | 0,065 | s/op  | 69965156,000    | B/op  |
 
 ## Build and run
 ### Build
@@ -52,7 +53,7 @@ To build cli run
 ./gradlew :cli:shadowJar
 ```
 ### Run
-Run downloaded or builded jar
+Run downloaded or built jar
 ```shell
 java -jar cli.jar your_path_to_config.json
 ```
@@ -123,6 +124,7 @@ To start using you only need run config in JSON format. For now, it looks like t
   }
 }
 ```
+Fill free to look for more [examples](examples)  
 **Note**:
 * node_name should be unique per node
 * plugin_id is unique id defined by plugin itself
@@ -164,7 +166,7 @@ For more details [Plugins docs](api/README.md)
 
 ## Some boring implementation details
 Graph compilation is a process that can be divided into two key stages: 1—optimization; 2—validation
-### Optimisation
+### Optimization
 The main goal of optimization is to map most strings to integers while storing the data in the most efficient structures. Thus, any global paths are converted to their numerical representations; for example, a.[0] is converted to [0, -2147483648] (array indices are stored using the index | 0x80000000). Node names are first converted to numbers (regardless of paths); the most efficient approach is to reconstruct the string from the number, as this involves an array search, whereas converting a string to a number uses a hash map (see the SymbolTable implementation for details). Later, when storing the graph in forward star format, they are flattened into a linear array, so we obtain the following hierarchy: `node_name` → `node_global_id` → `node_local_id`. This path, like the paths themselves, is optimized only for ascending order, where `local_id` → `global_id` uses an additional array in the subgraph, and `global_id` → `node_name` uses the array in SymbolTable. Note: Conversion via a hash map is used in the hot path only to execute plugin transition hints, and in cases where a plugin reads a path stored in an int context—most often, this is possible only if the plugin’s context corresponds to large subtrees that were not created by a single record from another plugin.
 ### Validation
 The most important part of graph validation is checking for race conditions. To do this, we use the concept of authorship: when a plugin writes something to a specific key, it becomes the author of that key. If, when merging contexts, the authors do not match, we can definitively say that we have encountered a race condition. This is implemented using a CoW Trie, where each node is a segment of a key. So, when two branches extend from a node, they inherit the parent’s context and make changes there; at some point, they may converge again at a single node (regardless of the configuration, a special node is injected at this moment specifically to catch such branches at a single merge point), and here an intersection check is performed according to the following rules
@@ -194,3 +196,5 @@ Think about routines as independent runs of subgraph. Each routine define its ow
 Be aware that all context in `in` branch are immutable and will only be shadowed by any changes.  
 Note
 * Each routine mush have only one root, because of impossibility ( in current architecture ) to detected WriteWrite conflict when merging its sub graph, if you want to start parallel branches from start please use `builtin.noop`
+### Executor
+Key optimization is thread can inherit first task created after plugin.

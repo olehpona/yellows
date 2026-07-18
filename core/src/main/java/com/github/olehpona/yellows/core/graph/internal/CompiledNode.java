@@ -15,8 +15,8 @@ import java.util.function.Function;
 public record CompiledNode(
         String plugin,
         Integer routineId,
-        List<PathPair> input,
-        List<PathPair> output,
+        PathPair[] input,
+        PathPair[] output,
         int[] next
 ) {
     public record PathPair(IntPath global, StringPath remote){}
@@ -31,8 +31,6 @@ public record CompiledNode(
             next[i++] = nextId;
         }
 
-        Function<Map.Entry<String, String>, PathPair> mapper = entry -> new PathPair(PathCompiler.compileGlobal(entry.getValue(), dict), PathCompiler.compileRemote(entry.getKey()));
-
         Integer rId = null;
         if (node.routine() != null) {
             rId = routineNames.getInt(node.routine());
@@ -43,8 +41,20 @@ public record CompiledNode(
             throw new GraphException(GraphExceptionCode.ERR_UNKNOWN_NODE, "Node must have either 'plugin' or 'routine': " + node.name());
         }
 
-        this(node.plugin(), rId, node.input().entrySet().stream().map(mapper).toList(),
-                node.output().entrySet().stream().map(mapper).toList(),
+        this(node.plugin(), rId,
+                mapPaths(node.input(), dict),
+                mapPaths(node.output(), dict),
                 next);
+    }
+    private static PathPair[] mapPaths(Map<String, String> paths, SymbolTable dict) {
+        PathPair[] arr = new PathPair[paths.size()];
+        int idx = 0;
+        for (Map.Entry<String, String> entry : paths.entrySet()) {
+            arr[idx++] = new PathPair(
+                    PathCompiler.compileGlobal(entry.getValue(), dict),
+                    PathCompiler.compileRemote(entry.getKey())
+            );
+        }
+        return arr;
     }
 }

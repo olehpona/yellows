@@ -3,6 +3,8 @@ package com.github.olehpona.yellows.core.graph.internal;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import com.github.olehpona.yellows.core.context.path.IntPath;
 
+import java.util.ArrayList;
+
 class BranchContext {
     TrieNode writes;
     int contextId;
@@ -46,37 +48,47 @@ class BranchContext {
         }
     }
 
-    public void merge(TrieNode current, TrieNode source) {
-        if (source.isExplicit) {
-            current.author = source.author;
-            current.isExplicit = true;
-            current.children.clear();
-            current.hasReader = true;
-            current.hasWriteDeeper = false;
-            current.hasReadDeeper = false;
-            return;
-        } else {
-            current.hasReader = current.hasReader || source.hasReader;
-            current.hasWriteDeeper = current.hasWriteDeeper || source.hasWriteDeeper;
-            current.hasReadDeeper = current.hasReadDeeper || source.hasReadDeeper;
-        }
+    public void merge(TrieNode startCurrent, TrieNode startSource) {
+        ArrayList<TrieNode> stack = new ArrayList<>();
 
-        for (Int2ObjectMap.Entry<TrieNode> entry : source.children.entrySet()) {
-            int key = entry.getIntKey();
-            TrieNode sourceChild = entry.getValue();
-            TrieNode currentChild = current.children.get(key);
+        stack.add(startCurrent);
+        stack.add(startSource);
 
-            if (currentChild == sourceChild) continue;
-
-            if (currentChild == null) {
-                current.children.put(key, sourceChild);
+        while (!stack.isEmpty()) {
+            TrieNode source = stack.removeLast();
+            TrieNode current = stack.removeLast();
+            if (source.isExplicit) {
+                current.author = source.author;
+                current.isExplicit = true;
+                current.children.clear();
+                current.hasReader = true;
+                current.hasWriteDeeper = false;
+                current.hasReadDeeper = false;
+                return;
             } else {
-                if (currentChild.contextId != this.contextId) {
-                    currentChild = new TrieNode(currentChild, this.contextId);
-                    current.children.put(key, currentChild);
+                current.hasReader = current.hasReader || source.hasReader;
+                current.hasWriteDeeper = current.hasWriteDeeper || source.hasWriteDeeper;
+                current.hasReadDeeper = current.hasReadDeeper || source.hasReadDeeper;
+            }
+
+            for (Int2ObjectMap.Entry<TrieNode> entry : source.children.entrySet()) {
+                int key = entry.getIntKey();
+                TrieNode sourceChild = entry.getValue();
+                TrieNode currentChild = current.children.get(key);
+
+                if (currentChild == sourceChild) continue;
+
+                if (currentChild == null) {
+                    current.children.put(key, sourceChild);
+                } else {
+                    if (currentChild.contextId != this.contextId) {
+                        currentChild = new TrieNode(currentChild, this.contextId);
+                        current.children.put(key, currentChild);
+                    }
+                    merge(currentChild, sourceChild);
                 }
-                merge(currentChild, sourceChild);
             }
         }
+
     }
 }

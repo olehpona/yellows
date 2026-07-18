@@ -8,6 +8,7 @@ import com.github.olehpona.yellows.core.graph.SubGraph;
 import com.github.olehpona.yellows.core.graph.exceptions.GraphException;
 import com.github.olehpona.yellows.core.graph.exceptions.GraphExceptionCode;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
@@ -65,30 +66,41 @@ public class GraphValidator {
         nextCtx.merge(nextCtx.writes, currCtx.writes);
     }
 
-    private static void checkOverlap(TrieNode current, TrieNode updates, int mergeNode) {
-        if (current == updates) return;
+    private static void checkOverlap(TrieNode startCurrent, TrieNode startUpdates, int mergeNode) {
+        ArrayList<TrieNode> stack = new ArrayList<>();
 
-        if (!updates.isExplicit && !updates.hasReader && updates.children.isEmpty()) return;
-        if (!current.isExplicit && !current.hasReader && current.children.isEmpty()) return;
+        stack.add(startCurrent);
+        stack.add(startUpdates);
 
-        if (current.author != updates.author) {
-            throwContextCollisionError(mergeNode, current.author, updates.author);
-        }
+        while (!stack.isEmpty()) {
+            TrieNode updates = stack.removeLast();
+            TrieNode current = stack.removeLast();
+            if (current == updates) return;
 
-        if ((current.hasReader && updates.hasWriteDeeper) || (updates.hasReader && current.hasWriteDeeper)) {
-            throwContextCollisionError(mergeNode, current.author, updates.author);
-        }
+            if (!updates.isExplicit && !updates.hasReader && updates.children.isEmpty()) return;
+            if (!current.isExplicit && !current.hasReader && current.children.isEmpty()) return;
 
-        if (!current.hasWriteDeeper && !updates.hasWriteDeeper) {
-            return;
-        }
+            if (current.author != updates.author) {
+                throwContextCollisionError(mergeNode, current.author, updates.author);
+            }
 
-        for (Int2ObjectMap.Entry<TrieNode> entry : updates.children.entrySet()) {
-            TrieNode currentNode = current.children.get(entry.getIntKey());
-            if (currentNode != null) {
-                checkOverlap(currentNode, entry.getValue(), mergeNode);
+            if ((current.hasReader && updates.hasWriteDeeper) || (updates.hasReader && current.hasWriteDeeper)) {
+                throwContextCollisionError(mergeNode, current.author, updates.author);
+            }
+
+            if (!current.hasWriteDeeper && !updates.hasWriteDeeper) {
+                return;
+            }
+
+            for (Int2ObjectMap.Entry<TrieNode> entry : updates.children.entrySet()) {
+                TrieNode currentNode = current.children.get(entry.getIntKey());
+                if (currentNode != null) {
+                    stack.add(currentNode);
+                    stack.add(entry.getValue());
+                }
             }
         }
+
     }
 
     private static void throwContextCollisionError(int mergeNode, int currentAuthor, int updateAuthor) {

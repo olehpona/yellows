@@ -49,35 +49,37 @@ public class GraphCompiler {
         IntArrayList localToGlobalList = new IntArrayList();
         IntOpenHashSet inProcess = new IntOpenHashSet();
 
-        record VisitRecord(int node, boolean isOut){}
-        List<VisitRecord> toVisit = new ArrayList<>();
+        IntArrayList toVisit = new IntArrayList();
 
         globalToLocal.put(root, 0);
-        toVisit.add(new VisitRecord(root, false));
+        toVisit.add(root);
         localToGlobalList.add(root);
 
         while (!toVisit.isEmpty()) {
-            var node = toVisit.getLast();
-            toVisit.removeLast();
+            int val = toVisit.removeInt(toVisit.size() - 1);
 
-            if (node.isOut()) {
-                inProcess.remove(node.node());
+            boolean isOut = val < 0;
+            int nodeId = isOut ? ~val : val;
+
+            if (isOut) {
+                inProcess.remove(nodeId);
                 continue;
             }
-            if (!inProcess.add(node.node)) {
-                throw new GraphException(GraphExceptionCode.ERR_LOOP, String.format("Loop detected at node %s from root %s", node.node(), root));
+            if (!inProcess.add(nodeId)) {
+                throw new GraphException(GraphExceptionCode.ERR_LOOP, String.format("Loop detected at node %s from root %s", nodeId, root));
             }
 
-            toVisit.add(new VisitRecord(node.node(), true));
-            int nodeId = node.node();
+            toVisit.add(~nodeId);
+
             if (nodeId >= graph.size()) {
                 throw new GraphException(GraphExceptionCode.ERR_UNKNOWN_NODE, "Next node is not defined");
             }
-            for (int next: graph.get(node.node()).next()) {
+
+            for (int next : graph.get(nodeId).next()) {
                 if (!globalToLocal.containsKey(next)) {
                     globalToLocal.put(next, localToGlobalList.size());
                     localToGlobalList.add(next);
-                    toVisit.add(new VisitRecord(next, false));
+                    toVisit.add(next);
                 }
             }
         }
@@ -106,45 +108,5 @@ public class GraphCompiler {
         childrenStart[n] = cursor;
 
         return new SubGraph(inDegree, childrenStart, childrenFlat, localToGlobal, offset);
-    }
-
-    public static RoutineData[] compileRoutines(
-            Map<String, List<Node>> rawRoutines,
-            SymbolTable routineNames,
-            SymbolTable dict,
-            List<NodeData> globalNodeData) {
-
-        RoutineData[] compiled = new RoutineData[rawRoutines.size()];
-
-        for (String routineName : rawRoutines.keySet()) {
-            routineNames.register(routineName);
-        }
-
-        for (Map.Entry<String, List<Node>> entry : rawRoutines.entrySet()) {
-            String routineName = entry.getKey();
-            List<Node> rawNodes = entry.getValue();
-            int routineId = routineNames.getInt(routineName);
-
-            SymbolTable localNodeNames = new SymbolTable();
-            List<String> roots = GraphAnalyzer.findRoots(rawNodes);
-
-            if (roots.size() > 1) {
-                throw new GraphException(GraphExceptionCode.ERR_BAD_ROUTINE, "Routine must contain one root");
-            }
-
-            List<CompiledNode> compiledNodes = compileNodes(rawNodes, localNodeNames, dict, roots, routineNames);
-
-            int routineOffset = globalNodeData.size();
-            for (CompiledNode cn : compiledNodes) {
-                globalNodeData.add(new NodeData(cn));
-            }
-
-            int rootId = localNodeNames.getInt(roots.getFirst());
-            SubGraph subGraph = buildSubGraph(rootId, compiledNodes, routineOffset);
-
-            compiled[routineId] = new RoutineData(subGraph, routineName, localNodeNames);
-        }
-
-        return compiled;
     }
 }

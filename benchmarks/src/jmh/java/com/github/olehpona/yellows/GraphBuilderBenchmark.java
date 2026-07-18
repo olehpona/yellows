@@ -1,8 +1,11 @@
 package com.github.olehpona.yellows;
 
+import com.github.olehpona.yellows.core.graph.Graph;
 import com.github.olehpona.yellows.core.graph.GraphBuilder;
 import com.github.olehpona.yellows.core.graph.Node;
 import org.openjdk.jmh.annotations.*;
+
+import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
@@ -13,6 +16,8 @@ import java.util.concurrent.TimeUnit;
 @Measurement(iterations = 1, time = 1)
 public class GraphBuilderBenchmark {
     List<Node> nodes;
+
+    private Graph retainedGraph;
 
     @Setup(Level.Trial)
     public void prepare() {
@@ -54,13 +59,15 @@ public class GraphBuilderBenchmark {
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void testWithValidation() {
-        GraphBuilder.buildGraph(nodes, Map.of(), 1, false);
+    public Graph testWithValidation() {
+        retainedGraph = GraphBuilder.buildGraph(nodes, Map.of(), 1, true);
+        return retainedGraph;
     }
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    public void testWithoutValidation() {
-        GraphBuilder.buildGraph(nodes, Map.of(), 1, true);
+    public Graph testWithoutValidation() {
+        retainedGraph = GraphBuilder.buildGraph(nodes, Map.of(), 1, true);
+        return retainedGraph;
     }
 }

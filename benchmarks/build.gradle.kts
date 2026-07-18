@@ -11,7 +11,6 @@ dependencies {
 }
 
 jmh {
-    excludes.add("ExecutorBenchmark")
     profilers.add("gc")
 }
 

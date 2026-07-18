@@ -1,6 +1,5 @@
 package com.github.olehpona.yellows.core.graph;
 
-import it.unimi.dsi.fastutil.ints.*;
 import com.github.olehpona.yellows.core.graph.exceptions.GraphException;
 import com.github.olehpona.yellows.core.graph.exceptions.GraphExceptionCode;
 import com.github.olehpona.yellows.core.graph.internal.CompiledNode;
@@ -13,6 +12,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 
@@ -25,11 +25,14 @@ public class GraphBuilder {
             logger.warn("Disabled graph validation");
         }
         SymbolTable dict = new SymbolTable();
-        SymbolTable nodeNames = new SymbolTable();
-        SymbolTable routineNames = new SymbolTable();
-        ArrayList<NodeData> nodeData = new ArrayList<>();
+        SymbolTable nodeNames = new SymbolTable(nodes.size());
+        SymbolTable routineNames = new SymbolTable(routines.size());
 
-        RoutineData[] routinesData = GraphCompiler.compileRoutines(routines, routineNames, dict, nodeData);
+        int totalNodesEstimate = nodes.size();
+        for (List<Node> rNodes : routines.values()) totalNodesEstimate += rNodes.size();
+        ArrayList<NodeData> nodeData = new ArrayList<>(totalNodesEstimate);
+
+        RoutineData[] routinesData = compileRoutines(routines, routineNames, dict, nodeData);
 
         List<String> roots = GraphAnalyzer.findRoots(nodes);
         List<CompiledNode> res = GraphCompiler.compileNodes(nodes, nodeNames,dict, roots, routineNames);
@@ -41,26 +44,32 @@ public class GraphBuilder {
 
         int rootCtx = nodeNames.register(ROOT_AUTHOR);
 
-        IntSet reachableNodes = new IntOpenHashSet();
+        BitSet reachableNodes = new BitSet(nodes.size());
+        int[] reachableCount = new int[]{0};
         SubGraph[] subGraphs = new SubGraph[roots.size()];
 
         if (!disableValidation) {
             try (ExecutorService executor = Executors.newFixedThreadPool(threadCount)) {
-                List<CompletableFuture<Void>> futures = roots.stream().map(root -> {
-                    int rootId = nodeNames.register(root);
+                List<CompletableFuture<Void>> futures = new ArrayList<>(roots.size() + routinesData.length);
+
+                for (String root : roots) {
+                    int rootId = nodeNames.getInt(root);
                     SubGraph subGraph = GraphCompiler.buildSubGraph(rootId, res, mainGraphOffset);
                     subGraphs[rootId] = subGraph;
 
-                    for (int global: subGraph.localToGlobal()) {
-                        reachableNodes.add(global);
+                    for (int global : subGraph.localToGlobal()) {
+                        if (!reachableNodes.get(global)) {
+                            reachableNodes.set(global);
+                            reachableCount[0]++;
+                        }
                     }
 
-                    return CompletableFuture.runAsync(() -> GraphValidator.validateKeyUsage(subGraph, nodeData, rootCtx), executor);
-                }).collect(Collectors.toCollection(ArrayList<CompletableFuture<Void>>::new));
+                    futures.add(CompletableFuture.runAsync(() ->
+                            GraphValidator.validateKeyUsage(subGraph, nodeData, rootCtx), executor));
+                }
 
                 for (RoutineData meta : routinesData) {
                     int routineRootCtx = meta.nodeNames().register(ROOT_AUTHOR);
-
                     futures.add(CompletableFuture.runAsync(() ->
                             GraphValidator.validateKeyUsage(meta.subGraph(), nodeData, routineRootCtx), executor));
                 }
@@ -77,22 +86,65 @@ public class GraphBuilder {
             }
         } else {
             for (String root: roots) {
-                int rootId = nodeNames.register(root);
+                int rootId = nodeNames.getInt(root);
                 SubGraph subGraph = GraphCompiler.buildSubGraph(rootId, res, mainGraphOffset);
                 subGraphs[rootId] = subGraph;
 
                 for (int global: subGraph.localToGlobal()) {
-                    reachableNodes.add(global);
+                    if (!reachableNodes.get(global)) {
+                        reachableNodes.set(global);
+                        reachableCount[0]++;
+                    }
                 }
             }
         }
 
-        if (reachableNodes.size() != nodes.size()) {
-            logger.error("Unreachable disconnected loop detected. Nodes count mismatch expected {} counted {}.", nodes.size(), reachableNodes.size());
+        if (reachableCount[0] != nodes.size()) {
+            logger.error("Unreachable disconnected loop detected. Nodes count mismatch expected {} counted {}.", nodes.size(), reachableCount[0]);
             throw new GraphException(GraphExceptionCode.ERR_LOOP, "Unreachable disconnected loop detected!");
         }
 
         return new Graph(Arrays.asList(subGraphs),Arrays.asList(routinesData), nodeData, dict, nodeNames);
+    }
+
+    public static RoutineData[] compileRoutines(
+            Map<String, List<Node>> rawRoutines,
+            SymbolTable routineNames,
+            SymbolTable dict,
+            List<NodeData> globalNodeData) {
+
+        RoutineData[] compiled = new RoutineData[rawRoutines.size()];
+
+        for (String routineName : rawRoutines.keySet()) {
+            routineNames.register(routineName);
+        }
+
+        for (Map.Entry<String, List<Node>> entry : rawRoutines.entrySet()) {
+            String routineName = entry.getKey();
+            List<Node> rawNodes = entry.getValue();
+            int routineId = routineNames.getInt(routineName);
+
+            SymbolTable localNodeNames = new SymbolTable(rawNodes.size());
+            List<String> roots = GraphAnalyzer.findRoots(rawNodes);
+
+            if (roots.size() > 1) {
+                throw new GraphException(GraphExceptionCode.ERR_BAD_ROUTINE, "Routine must contain one root");
+            }
+
+            List<CompiledNode> compiledNodes = GraphCompiler.compileNodes(rawNodes, localNodeNames, dict, roots, routineNames);
+
+            int routineOffset = globalNodeData.size();
+            for (CompiledNode cn : compiledNodes) {
+                globalNodeData.add(new NodeData(cn));
+            }
+
+            int rootId = localNodeNames.getInt(roots.getFirst());
+            SubGraph subGraph = GraphCompiler.buildSubGraph(rootId, compiledNodes, routineOffset);
+
+            compiled[routineId] = new RoutineData(subGraph, routineName, localNodeNames);
+        }
+
+        return compiled;
     }
 
     public static Graph buildGraph(List<Node> nodes, Map<String, List<Node>> routines) {
