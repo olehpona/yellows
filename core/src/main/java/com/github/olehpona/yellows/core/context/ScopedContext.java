@@ -3,6 +3,8 @@ package com.github.olehpona.yellows.core.context;
 import com.github.olehpona.yellows.core.context.path.PathSegment;
 import com.github.olehpona.yellows.core.context.path.utils.SymbolTable;
 
+import java.util.function.Supplier;
+
 public class ScopedContext extends WriteContextValue {
     private final ReadContextValue parentScope;
     private final WriteContextValue localState;
@@ -26,6 +28,11 @@ public class ScopedContext extends WriteContextValue {
     @Override
     protected void putChild(PathSegment segment, SymbolTable dict, ReadContextValue value) {
         localState.putChild(segment, dict, value);
+    }
+
+    @Override
+    protected WriteContextValue computeIfAbsentChild(PathSegment segment, SymbolTable dict, Supplier<WriteContextValue> childFactory) {
+        return localState.computeIfAbsentChild(segment, dict, childFactory);
     }
 
     @Override

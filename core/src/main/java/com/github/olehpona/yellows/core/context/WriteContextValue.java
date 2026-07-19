@@ -44,6 +44,12 @@ public abstract class WriteContextValue extends ReadContextValue {
 
     }
 
+    protected abstract WriteContextValue computeIfAbsentChild(
+            PathSegment segment,
+            SymbolTable dict,
+            Supplier<WriteContextValue> childFactory
+    );
+
     @Override
     public abstract WriteContextValue deepCopy();
 }
