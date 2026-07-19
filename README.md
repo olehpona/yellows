@@ -3,7 +3,7 @@ Yellows is a pipeline engine powered by a directed acyclic graph ( DAG ). Built 
 
 ## Features
 * **Graph compiler** Identifies race conditions and optimizes the graph structure to ensure maximum runtime performance 
-* __Lock free*__ Unsynchronized threads where relentless work outweighs idle waiting
+* __Lock free* **__ Unsynchronized threads where relentless work outweighs idle waiting
 * **Data oriented** Pedal to the metal. Leveraging Data-Oriented Design to bypass object-oriented bloat and extract maximum throughput from modern CPUs.
 * **Extendable** Designed not to be all in one solution but to give foundation for implementing anything
 * **Routines** Do not repeat yourself, write your favorite pipelines once and embed them everywhere else
@@ -190,7 +190,9 @@ Note: IntPath iterator reuses the same segment.
 ### Lock free run context
 To ensure optimal performance with parallel run context branches, the implementation is completely lock-free*. To ensure optimal performance with parallel threads, the run context is designed to be completely lock-free*. This is achieved because race conditions have already been verified and the context does not require synchronization; furthermore, since the graph is stored in the `inDegree` array, it can be used as an `AtomicIntegerArray`. The rest of the structures required for operation are read-only and do not require synchronization.  
 It is worth mentioning the implementation of node state storage in `inDegree`, since the cancellation of a thread and its request may occur in different orders. To ensure that cancellation does not remove nodes that were supposed to be executed upon request by another thread, an `isWanted` flag has been added, which, as in the example with indexes, is the 31st bit of a 32-bit int.  
-*Unfortunately, despite the bold claims of a “lock-free” run context, it is not actually lock-free; it must synchronize during copying, since it is not possible to safely copy both the context and inDegree. But this is only the case when trigger spawns new run context.
+**Unfortunately, despite the bold claims of a “lock-free” run context, it is not actually lock-free**  
+*It must synchronize during copying, since it is not possible to safely copy both the context and inDegree. But this is only the case when trigger spawns new run context.  
+**To ensure there are no race conditions in intermediate keys when nodes create the required path, all non-primitives use an rw lock. For example: vertex a writes to a.val.b, and vertex b writes to a.val.c. For the validator, these are separate, unrelated entries, but it may turn out that a value is defined only for a; in that case, in order to write to their leaves, both vertices must create a val—and this is precisely where a race condition could occur. Also, to ensure data integrity, the iteration over non-primitives will copy the data.
 ### Routines
 Think about routines as independent runs of subgraph. Each routine define its own `RunContext` which allows it to be completely independent as in context as in using node names.  
 Be aware that all context in `in` branch are immutable and will only be shadowed by any changes.  
