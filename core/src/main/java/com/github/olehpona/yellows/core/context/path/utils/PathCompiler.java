@@ -12,7 +12,7 @@ public class PathCompiler {
             String p = parts[i];
             if (p.startsWith("[") && p.endsWith("]")) {
                 int index = Integer.parseInt(p.substring(1, p.length() - 1));
-                segments[i] = index | 0x80000000;
+                segments[i] = IntPath.makeIndex(index);
             } else {
                 segments[i] = dict.register(p);
             }

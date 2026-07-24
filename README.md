@@ -157,12 +157,15 @@ For more details [Plugins docs](api/README.md)
 * `builtin.math.subtract`: inputs - `a`, `b`, outputs - `out`
 * `builtin.math.multiply`: inputs - `a`, `b`, outputs - `out`
 * `builtin.math.divide`: inputs - `a`, `b`, outputs - `out`
+* `builtin.logic.eq`: inputs - `a`, `b`, outputs - `out`
+* `builtin.logic.gt`: inputs - `a`, `b`, outputs - `out`
+* `builtin.logic.gte`: inputs - `a`, `b`, outputs - `out`
+* `builtin.logic.lt`: inputs - `a`, `b`, outputs - `out`
+* `builtin.logic.lte`: inputs - `a`, `b`, outputs - `out`
 
 ## What next
 * More test
-* Builtin plugins for logical operations
 * External plugins collection for io operations
-* Observability
 
 ## Some boring implementation details
 Graph compilation is a process that can be divided into two key stages: 1—optimization; 2—validation

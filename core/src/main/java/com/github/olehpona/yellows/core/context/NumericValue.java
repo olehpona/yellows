@@ -93,4 +93,69 @@ public abstract class NumericValue extends ReadContextValue {
                 (a, b) -> b == 0 ? 0 : a / b
         );
     }
+
+    @Override
+    public boolean eq(ReadContextValue o) {
+        if (o instanceof NumericValue other) {
+            byte resType = (byte) Math.max(this.type, other.type);
+            if (resType == T_DOUBLE || resType == T_FLOAT){
+                return this.asSafeDouble() == other.asSafeDouble();
+            } else if (resType == T_INT || resType == T_LONG) {
+                return this.asSafeLong() == other.asSafeLong();
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public boolean gt(ReadContextValue o) {
+        if (o instanceof NumericValue other) {
+            byte resType = (byte) Math.max(this.type, other.type);
+            if (resType == T_DOUBLE || resType == T_FLOAT){
+                return this.asSafeDouble() > other.asSafeDouble();
+            } else if (resType == T_INT || resType == T_LONG) {
+                return this.asSafeLong() > other.asSafeLong();
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public boolean gte(ReadContextValue o) {
+        if (o instanceof NumericValue other) {
+            byte resType = (byte) Math.max(this.type, other.type);
+            if (resType == T_DOUBLE || resType == T_FLOAT){
+                return this.asSafeDouble() >= other.asSafeDouble();
+            } else if (resType == T_INT || resType == T_LONG) {
+                return this.asSafeLong() >= other.asSafeLong();
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public boolean lt(ReadContextValue o) {
+        if (o instanceof NumericValue other) {
+            byte resType = (byte) Math.max(this.type, other.type);
+            if (resType == T_DOUBLE || resType == T_FLOAT){
+                return this.asSafeDouble() < other.asSafeDouble();
+            } else if (resType == T_INT || resType == T_LONG) {
+                return this.asSafeLong() < other.asSafeLong();
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public boolean lte(ReadContextValue o) {
+        if (o instanceof NumericValue other) {
+            byte resType = (byte) Math.max(this.type, other.type);
+            if (resType == T_DOUBLE || resType == T_FLOAT){
+                return this.asSafeDouble() <= other.asSafeDouble();
+            } else if (resType == T_INT || resType == T_LONG) {
+                return this.asSafeLong() <= other.asSafeLong();
+            }
+        }
+        return false;
+    }
 }

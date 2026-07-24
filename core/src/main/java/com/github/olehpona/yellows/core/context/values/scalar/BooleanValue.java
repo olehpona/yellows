@@ -19,4 +19,44 @@ public class BooleanValue extends ReadContextValue {
     public NumericValue toNumeric() {
         return new IntValue(value? 1: 0);
     }
+
+    @Override
+    public boolean eq(ReadContextValue o)   {
+        if (o instanceof BooleanValue other) {
+            return value == other.value;
+        }
+        return false;
+    }
+
+    @Override
+    public boolean gt(ReadContextValue o)   {
+        if (o instanceof BooleanValue other) {
+            return value && !other.value;
+        }
+        return false;
+    }
+
+    @Override
+    public boolean gte(ReadContextValue o)   {
+        if (o instanceof BooleanValue other) {
+            return (value && !other.value) || (value == other.value) ;
+        }
+        return false;
+    }
+
+    @Override
+    public boolean lt(ReadContextValue o)   {
+        if (o instanceof BooleanValue other) {
+            return !value && other.value;
+        }
+        return false;
+    }
+
+    @Override
+    public boolean lte(ReadContextValue o)   {
+        if (o instanceof BooleanValue other) {
+            return (!value && other.value) || (value == other.value);
+        }
+        return false;
+    }
 }

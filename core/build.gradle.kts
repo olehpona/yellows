@@ -1,13 +1,13 @@
 plugins {
-    id("java")
+    id("java-library")
     jacoco
     id("com.gradleup.shadow") version "9.5.1"
 }
 
 dependencies {
-    implementation(project(":api"))
+    api(project(":api"))
     implementation("org.slf4j:slf4j-api:2.0.18")
-    implementation("it.unimi.dsi:fastutil:8.5.18")
+    implementation("it.unimi.dsi:fastutil-core:8.5.18")
     testImplementation(platform("org.junit:junit-bom:6.0.0"))
     testImplementation("org.assertj:assertj-core:3.27.7")
     testImplementation("org.junit.jupiter:junit-jupiter")

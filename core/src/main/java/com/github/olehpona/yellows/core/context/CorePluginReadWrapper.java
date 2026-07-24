@@ -1,5 +1,6 @@
 package com.github.olehpona.yellows.core.context;
 
+import com.github.olehpona.yellows.core.context.path.IntPath;
 import com.github.olehpona.yellows.core.context.path.StringPath;
 import com.github.olehpona.yellows.core.context.path.utils.SymbolTable;
 import com.github.olehpona.yellows.api.context.PluginReadWrapper;
@@ -44,6 +45,11 @@ public class CorePluginReadWrapper implements PluginReadWrapper {
     public double asDouble(double def)      { return val.asDouble(def); }
     @Override
     public boolean isDouble()               { return val.isDouble(); }
+
+    @Override
+    public byte[] asBytes(byte[] def)       { return def; }
+    @Override
+    public boolean isBytes()                { return false; }
 
     @Override
     public boolean isMissing()              { return val.isMissing(); }
@@ -95,6 +101,10 @@ public class CorePluginReadWrapper implements PluginReadWrapper {
         return new CorePluginReadWrapper(val.resolvePath(StringPath.fromString(path), dict), dict);
     }
 
+    public PluginReadWrapper getIndex(int index) {
+        return new CorePluginReadWrapper(val.resolvePath(new IntPath(new int[]{IntPath.makeIndex(index)}), dict), dict);
+    }
+
     CorePluginReadWrapper deepCopy() {
         return new CorePluginReadWrapper(val.deepCopy(), dict);
     }
@@ -124,4 +134,44 @@ public class CorePluginReadWrapper implements PluginReadWrapper {
     public int size() {
         return val.size();
     }
+
+    @Override
+    public boolean eq(PluginReadWrapper other){
+        if (!(other instanceof CorePluginReadWrapper wrapper)) {
+            throw new IllegalArgumentException("Untrusted wrapper");
+        }
+        return this.val.eq(wrapper.val);
+    };
+
+    @Override
+    public boolean gt(PluginReadWrapper other){
+        if (!(other instanceof CorePluginReadWrapper wrapper)) {
+            throw new IllegalArgumentException("Untrusted wrapper");
+        }
+        return this.val.gt(wrapper.val);
+    };
+
+    @Override
+    public boolean lt(PluginReadWrapper other){
+        if (!(other instanceof CorePluginReadWrapper wrapper)) {
+            throw new IllegalArgumentException("Untrusted wrapper");
+        }
+        return this.val.lt(wrapper.val);
+    };
+
+    @Override
+    public boolean gte(PluginReadWrapper other){
+        if (!(other instanceof CorePluginReadWrapper wrapper)) {
+            throw new IllegalArgumentException("Untrusted wrapper");
+        }
+        return this.val.gte(wrapper.val);
+    };
+
+    @Override
+    public boolean lte(PluginReadWrapper other){
+        if (!(other instanceof CorePluginReadWrapper wrapper)) {
+            throw new IllegalArgumentException("Untrusted wrapper");
+        }
+        return this.val.lte(wrapper.val);
+    };
 }

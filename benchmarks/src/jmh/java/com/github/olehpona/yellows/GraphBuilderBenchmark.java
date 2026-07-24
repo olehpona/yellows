@@ -60,7 +60,7 @@ public class GraphBuilderBenchmark {
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
     public Graph testWithValidation() {
-        retainedGraph = GraphBuilder.buildGraph(nodes, Map.of(), 1, true);
+        retainedGraph = GraphBuilder.buildGraph(nodes, Map.of(), 1, false);
         return retainedGraph;
     }
 

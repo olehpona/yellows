@@ -11,13 +11,15 @@ import com.github.olehpona.yellows.core.executor.exceptions.ExecutorExceptionCod
 import com.github.olehpona.yellows.core.graph.NodeData;
 import com.github.olehpona.yellows.core.graph.SubGraph;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicIntegerArray;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-public class RunContext {
+class RunContext {
     private final WriteContextValue root;
     private final AtomicIntegerArray inDegree;
     private final SubGraph subGraph;
@@ -25,6 +27,12 @@ public class RunContext {
     private final SymbolTable dict;
     private final SymbolTable nodeDict;
     private final AtomicReference<Throwable> killReason = new AtomicReference<>(null);
+
+    private final byte[] status;
+    private static final byte NODE_PENDING = 0;
+    private static final byte NODE_RUNNING = 1;
+    private static final byte NODE_FINISHED = 2;
+    private static final byte NODE_CANCELED = 3;
 
     private static final AtomicLong idGenerator = new AtomicLong(0);
     private final long ctxId = idGenerator.getAndIncrement();
@@ -46,6 +54,7 @@ public class RunContext {
             }
             this.root = other.root.deepCopy();
             inDegree = inDegreeCopy;
+            status = Arrays.copyOf(other.status, other.status.length);
         } finally {
            lock.writeLock().unlock();
         }
@@ -59,6 +68,7 @@ public class RunContext {
         this.nodeData = nodeData;
         this.dict = dict;
         this.nodeDict = nodeDict;
+        this.status = new byte[subGraph.inDegree().length];
     }
 
     public int getSymbolId(int localNodeId) {
@@ -70,6 +80,8 @@ public class RunContext {
     }
 
     public ReadContextValue buildInputContext(int nodeId, WriteContextValue inputContext) {
+        status[nodeId] = NODE_RUNNING;
+
         int globalIndex = getGlobalNodeIndex(nodeId);
         var currentState = parseIntValue(inDegree.get(nodeId));
 
@@ -108,6 +120,8 @@ public class RunContext {
     }
 
     public int[] mergeOutput(int nodeId, ReadContextValue ctx, List<String> nextHint) {
+        status[nodeId] = NODE_FINISHED;
+
         int globalIndex = getGlobalNodeIndex(nodeId);
         NodeData data = nodeData.get(globalIndex);
         IntOpenHashSet hintGlobalIds = new IntOpenHashSet(nextHint.size());
@@ -159,6 +173,8 @@ public class RunContext {
         while (!toVisit.isEmpty()) {
             int node = toVisit.dequeueInt();
 
+            status[nodeId] = NODE_CANCELED;
+
             for (var it = subGraph.childIterator(node); it.hasNext();) {
                 int childId = it.next().getChild();
                 InDegreeValue currentDegree = decrementAndGetInDegree(childId, false);
@@ -188,11 +204,23 @@ public class RunContext {
 
     public String getTrace(int nodeId) {
         int globalId = getSymbolId(nodeId);
-        String nodeName = (nodeDict != null) ? nodeDict.getString(globalId) : "NULL_DICT";
+        String nodeName = nodeDict.getString(globalId);
         return String.format("%s [%d]", nodeName, ctxId);
     }
 
     public long getContextId() {
         return ctxId;
+    }
+
+    public ObservabilityReport[] getObservabilityReports() {
+        ObservabilityReport[] result = new ObservabilityReport[status.length];
+
+        for (int i = 0; i < status.length; i++) {
+            int globalId = getSymbolId(i);
+            String nodeName = nodeDict.getString(globalId);
+            result[i] =  new ObservabilityReport(nodeName, status[globalId]);
+        }
+
+        return result;
     }
 }

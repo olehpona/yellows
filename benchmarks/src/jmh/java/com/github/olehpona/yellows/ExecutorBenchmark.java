@@ -5,7 +5,6 @@ import com.github.olehpona.yellows.core.context.WriteContextValue;
 import com.github.olehpona.yellows.core.context.path.StringPath;
 import com.github.olehpona.yellows.core.context.values.scalar.IntValue;
 import com.github.olehpona.yellows.core.executor.Executor;
-import com.github.olehpona.yellows.core.executor.RunContext;
 import com.github.olehpona.yellows.core.graph.Graph;
 import com.github.olehpona.yellows.core.graph.GraphBuilder;
 import com.github.olehpona.yellows.core.graph.Node;
@@ -52,9 +51,7 @@ public class ExecutorBenchmark {
     @Benchmark
     @BenchmarkMode(Mode.Throughput)
     public void testNoopPipeline(NoopState state) {
-        RunContext runContext = new RunContext(ContextSupplier.getIntObject(), state.graph.subGraphs().getFirst(), state.graph.nodes(), state.graph.dict(), state.graph.nodeNames());
-
-        state.executor.spawnNode(runContext, 0);
+        state.executor.spawnNode(ContextSupplier.getIntObject(), state.graph.subGraphs().getFirst(),state.graph.nodeNames(), 0);
         state.executor.waitAll();
     }
 
@@ -91,9 +88,7 @@ public class ExecutorBenchmark {
     @Benchmark
     @BenchmarkMode(Mode.Throughput)
     public void testContextPipeline(ContextState state) {
-        RunContext runContext = new RunContext(state.writeContextValue, state.graph.subGraphs().getFirst(), state.graph.nodes(), state.graph.dict(), state.graph.nodeNames());
-
-        state.executor.spawnNode(runContext, 0);
+        state.executor.spawnNode(ContextSupplier.getIntObject(), state.graph.subGraphs().getFirst(),state.graph.nodeNames(), 0);
         state.executor.waitAll();
     }
 
@@ -122,9 +117,7 @@ public class ExecutorBenchmark {
     @Benchmark
     @BenchmarkMode(Mode.Throughput)
     public void testNoopFanout(FanoutState state) {
-        RunContext runContext = new RunContext(ContextSupplier.getIntObject(), state.graph.subGraphs().getFirst(), state.graph.nodes(), state.graph.dict(), state.graph.nodeNames());
-
-        state.executor.spawnNode(runContext, 0);
+        state.executor.spawnNode(ContextSupplier.getIntObject(), state.graph.subGraphs().getFirst(),state.graph.nodeNames(), 0);
         state.executor.waitAll();
     }
 
@@ -159,9 +152,7 @@ public class ExecutorBenchmark {
     @Benchmark
     @BenchmarkMode(Mode.Throughput)
     public void testRoutineSpawn(RoutineState state) {
-        RunContext runContext = new RunContext(ContextSupplier.getIntObject(), state.graph.subGraphs().getFirst(), state.graph.nodes(), state.graph.dict(), state.graph.nodeNames());
-
-        state.executor.spawnNode(runContext, 0);
+        state.executor.spawnNode(ContextSupplier.getIntObject(), state.graph.subGraphs().getFirst(),state.graph.nodeNames(), 0);
         state.executor.waitAll();
     }
 
@@ -192,9 +183,7 @@ public class ExecutorBenchmark {
     @Benchmark
     @BenchmarkMode(Mode.Throughput)
     public void testRoutineFanoutSpawn(RoutineFanoutState state) {
-        RunContext runContext = new RunContext(ContextSupplier.getIntObject(), state.graph.subGraphs().getFirst(), state.graph.nodes(), state.graph.dict(), state.graph.nodeNames());
-
-        state.executor.spawnNode(runContext, 0);
+        state.executor.spawnNode(ContextSupplier.getIntObject(), state.graph.subGraphs().getFirst(),state.graph.nodeNames(), 0);
         state.executor.waitAll();
     }
 
@@ -230,8 +219,7 @@ public class ExecutorBenchmark {
     @Benchmark
     @BenchmarkMode(Mode.Throughput)
     public void testDeepNesting(DeepNestingState state) {
-        RunContext runContext = new RunContext(ContextSupplier.getIntObject(), state.graph.subGraphs().getFirst(), state.graph.nodes(), state.graph.dict(), state.graph.nodeNames());
-        state.executor.spawnNode(runContext, 0);
+        state.executor.spawnNode(ContextSupplier.getIntObject(), state.graph.subGraphs().getFirst(),state.graph.nodeNames(), 0);
         state.executor.waitAll();
     }
 
@@ -267,8 +255,7 @@ public class ExecutorBenchmark {
     @Benchmark
     @BenchmarkMode(Mode.Throughput)
     public void testHighContention(ContentionState state) {
-        RunContext runContext = new RunContext(state.writeContextValue, state.graph.subGraphs().getFirst(), state.graph.nodes(), state.graph.dict(), state.graph.nodeNames());
-        state.executor.spawnNode(runContext, 0);
+        state.executor.spawnNode(ContextSupplier.getIntObject(), state.graph.subGraphs().getFirst(),state.graph.nodeNames(), 0);
         state.executor.waitAll();
     }
 
@@ -296,8 +283,7 @@ public class ExecutorBenchmark {
     @Benchmark
     @BenchmarkMode(Mode.Throughput)
     public void testExceptionPropagation(ExceptionState state) {
-        RunContext runContext = new RunContext(ContextSupplier.getIntObject(), state.graph.subGraphs().getFirst(), state.graph.nodes(), state.graph.dict(), state.graph.nodeNames());
-        state.executor.spawnNode(runContext, 0);
+        state.executor.spawnNode(ContextSupplier.getIntObject(), state.graph.subGraphs().getFirst(),state.graph.nodeNames(), 0);
         state.executor.waitAll();
     }
 }

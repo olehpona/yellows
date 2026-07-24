@@ -9,6 +9,10 @@ import java.util.NoSuchElementException;
 public class IntPath implements Iterable<IntPath.Segment> {
     private final int[] segments;
 
+    public static int makeIndex(int index) {
+         return index | 0x80000000;
+    }
+
     public IntPath(int[] segments) {
         this.segments = segments;
     }

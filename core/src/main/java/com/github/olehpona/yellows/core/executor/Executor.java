@@ -15,14 +15,18 @@ import com.github.olehpona.yellows.core.executor.exceptions.NodeException;
 import com.github.olehpona.yellows.core.graph.NodeData;
 import com.github.olehpona.yellows.core.graph.RoutineData;
 import com.github.olehpona.yellows.api.plugins.PluginNode;
+import com.github.olehpona.yellows.core.graph.SubGraph;
 import com.github.olehpona.yellows.core.plugins.PluginRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.lang.ref.Reference;
+import java.lang.ref.ReferenceQueue;
+import java.lang.ref.WeakReference;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Phaser;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class Executor {
     private final PluginRegistry registry;
@@ -33,6 +37,10 @@ public class Executor {
     private final Phaser phaser = new Phaser(1);
     private static final Logger logger = LoggerFactory.getLogger(Executor.class);
 
+    private final AtomicInteger creationCounter = new AtomicInteger(0);
+    ConcurrentMap<Long, RunContextWeakReference> runContexts = new ConcurrentHashMap<>();
+    ReferenceQueue<RunContext> referenceQueue = new ReferenceQueue<>();
+
     public Executor(PluginRegistry registry, SymbolTable dict, List<NodeData> nodeData, List<RoutineData> routineData) {
         this.registry = registry;
         this.executorService = Executors.newVirtualThreadPerTaskExecutor();
@@ -41,11 +49,11 @@ public class Executor {
         this.routineData = routineData;
     }
 
-    public void spawnNode(RunContext ctx, int nodeId) {
-        spawnNode(ctx, nodeId, phaser);
+    public void spawnNode(WriteContextValue root, SubGraph subGraph, SymbolTable nodeDict, int nodeId) {
+        spawnNode(createRunContext(root, subGraph, nodeDict), nodeId, phaser);
     }
 
-    public void spawnNode(RunContext ctx, int nodeId, Phaser phaser) {
+    void spawnNode(RunContext ctx, int nodeId, Phaser phaser) {
         phaser.register();
 
         executorService.submit(() -> {
@@ -64,9 +72,9 @@ public class Executor {
                 CorePluginCallback cb = new CorePluginCallback(ctx, executor, phaser, nodeId);
 
                 if (data.isRoutine()) {
-                    executor.executeRoutine(ctx, nodeId, data, phaser, cb);
+                    executor.executeRoutine(ctx, nodeId, data, cb);
                 } else {
-                    executor.executePlugin(ctx, nodeId, data, phaser, cb);
+                    executor.executePlugin(ctx, nodeId, data, cb);
                 }
 
                 if (cb.getNextInlineNode() >= 0) {
@@ -84,7 +92,7 @@ public class Executor {
         }
     }
 
-    void executePlugin(RunContext ctx, int nodeId, NodeData data, Phaser phaser, CorePluginCallback cb) {
+    void executePlugin(RunContext ctx, int nodeId, NodeData data, CorePluginCallback cb) {
         PluginReadWrapper context = new CorePluginReadWrapper(ctx.buildInputContext(nodeId, ContextSupplier.getStringObject()), dict);
         PluginNode plugin = registry.getPlugin(data.plugin());
 
@@ -99,7 +107,7 @@ public class Executor {
         }
     }
 
-    private void executeRoutine(RunContext ctx, int nodeId, NodeData data, Phaser parentPhaser, CorePluginCallback cb) {
+    private void executeRoutine(RunContext ctx, int nodeId, NodeData data, CorePluginCallback cb) {
         var inputArgs = ctx.buildInputContext(nodeId, ContextSupplier.getStringObject());
 
         var localState = ContextSupplier.getStringObject();
@@ -112,7 +120,7 @@ public class Executor {
         Phaser routinePhaser = new Phaser(1);
         routinePhaser.register();
 
-        RunContext routineCtx = new RunContext(routineRoot, meta.subGraph(), nodeData, dict, meta.nodeNames());
+        RunContext routineCtx = createRunContext(routineRoot, meta.subGraph(), meta.nodeNames());
 
         if (logger.isInfoEnabled()) {
             logger.info("Routine {} at {} spawned context {}", meta.name(), ctx.getTrace(nodeId), routineCtx.getContextId());
@@ -133,12 +141,70 @@ public class Executor {
         cb.completeAndReturn(routineResult, List.of());
     }
 
+    RunContext createRunContext(WriteContextValue root, SubGraph subGraph, SymbolTable nodeDict) {
+        var ctx =  new RunContext(root, subGraph, nodeData, dict, nodeDict);
+
+        if (creationCounter.incrementAndGet() % 1000 == 0) {
+            cleanRunningContextIds();
+        }
+
+        runContexts.put(ctx.getContextId(), new RunContextWeakReference(ctx, referenceQueue));
+
+        return ctx;
+    }
+
+    RunContext copyRunContext(RunContext other) {
+        var ctx =  new RunContext(other);
+
+        if (creationCounter.incrementAndGet() % 1000 == 0) {
+            cleanRunningContextIds();
+        }
+
+        runContexts.put(ctx.getContextId(), new RunContextWeakReference(ctx, referenceQueue));
+
+        return ctx;
+    }
+
+
     public void waitAll() {
         phaser.arriveAndAwaitAdvance();
     }
 
     public void shutdown() {
         executorService.shutdown();
+    }
+
+    void cleanRunningContextIds() {
+        Reference<?> ref;
+
+        while ((ref = referenceQueue.poll()) != null) {
+            if (ref instanceof RunContextWeakReference weakRef) {
+                runContexts.remove(weakRef.getId());
+            }
+        }
+    }
+
+    public List<Long> getAllRunningContextIds() {
+        cleanRunningContextIds();
+        List<Long> ids = new ArrayList<>();
+        for (RunContextWeakReference weakRef : runContexts.values()) {
+            if (weakRef.get() != null) {
+                ids.add(weakRef.getId());
+            }
+        }
+        return ids;
+    }
+
+    public ObservabilityReport[] getObservabilityReports(long runContextId) {
+        cleanRunningContextIds();
+        RunContextWeakReference weakRef = runContexts.get(runContextId);
+        if (weakRef == null) {
+            return new ObservabilityReport[0];
+        }
+
+        RunContext runContext = weakRef.get();
+
+        return runContext != null? runContext.getObservabilityReports(): new ObservabilityReport[0];
     }
 
     static String buildBeautifulErrorTrace(Throwable t) {

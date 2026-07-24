@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.concurrent.Phaser;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-public class CorePluginCallback implements PluginCallback {
+class CorePluginCallback implements PluginCallback {
     private final AtomicBoolean isFinished = new AtomicBoolean(false);
     private final RunContext ctx;
     private final Phaser phaser;
@@ -66,7 +66,7 @@ public class CorePluginCallback implements PluginCallback {
         }
 
         try {
-            var newCtx = new RunContext(ctx);
+            var newCtx = executor.copyRunContext(ctx);
             if (logger.isInfoEnabled()) {
                 logger.info("{} spawned context {}", ctx.getTrace(nodeId), newCtx.getContextId());
             }

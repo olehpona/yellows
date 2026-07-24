@@ -1,5 +1,6 @@
 package com.github.olehpona.yellows.core.context;
 
+import com.github.olehpona.yellows.core.context.path.IntPath;
 import com.github.olehpona.yellows.core.context.values.scalar.*;
 import com.github.olehpona.yellows.api.context.PluginReadWrapper;
 import com.github.olehpona.yellows.api.context.PluginWriteWrapper;
@@ -7,7 +8,9 @@ import com.github.olehpona.yellows.core.context.path.StringPath;
 import com.github.olehpona.yellows.core.context.path.utils.SymbolTable;
 import com.github.olehpona.yellows.core.context.values.scalar.*;
 
-public class CorePluginWriteWrapper implements PluginWriteWrapper {
+import java.util.Arrays;
+
+public class CorePluginWriteWrapper extends AbstractWriteWrapper {
     private static final CorePluginWriteWrapper MISSING = new CorePluginWriteWrapper(null);
     private static final SymbolTable dict = new SymbolTable();
     private SymbolTable overrideDict = null;
@@ -50,7 +53,8 @@ public class CorePluginWriteWrapper implements PluginWriteWrapper {
         putPath(path, other.getRaw());
     }
 
-    public void putPath(String path, ReadContextValue value) {
+    @Override
+    protected void putPath(String path, ReadContextValue value) {
         if (val == null) {
             throw new UnsupportedOperationException("Can not write into missing value");
         }
@@ -58,38 +62,33 @@ public class CorePluginWriteWrapper implements PluginWriteWrapper {
     }
 
     @Override
-    public void putPath(String path, int value) {
-        putPath(path, new IntValue(value));
+    protected void putIndex(int index, ReadContextValue value) {
+        if (val == null) {
+            throw new UnsupportedOperationException("Can not write into missing value");
+        }
+        val.putPath(new IntPath(new int[]{IntPath.makeIndex(index)}), getDict(), value);
     }
 
     @Override
-    public void putPath(String path, String value) {
-        putPath(path, new StringValue(value));
+    public void putIndex(int index, PluginWriteWrapper wrapper) {
+        if (!(wrapper instanceof CorePluginReadWrapper other)) {
+            throw new IllegalArgumentException("Untrusted wrapper");
+        }
+        if (overrideDict == null) {
+            overrideDict = other.dict;
+        }
+        putIndex(index, other.deepCopy().getRaw());
     }
 
     @Override
-    public void putPath(String path, long value) {
-        putPath(path, new LongValue(value));
-    }
-
-    @Override
-    public void putPath(String path, float value) {
-        putPath(path, new FloatValue(value));
-    }
-
-    @Override
-    public void putPath(String path, double value) {
-        putPath(path, new DoubleValue(value));
-    }
-
-    @Override
-    public void putPath(String path, boolean value) {
-        putPath(path, new BooleanValue(value));
-    }
-
-    @Override
-    public void deletePath(String path) {
-        putPath(path, DeleteMarker.INSTANCE);
+    public void putIndex(int index, PluginReadWrapper wrapper) {
+        if (!(wrapper instanceof CorePluginWriteWrapper other)) {
+            throw new IllegalArgumentException("Untrusted wrapper");
+        }
+        if (other.overrideDict == null) {
+            overrideDict = other.overrideDict;
+        }
+        putIndex(index, other.getRaw());
     }
 
     public ReadContextValue getRaw() {

@@ -26,6 +26,9 @@ public abstract class ReadContextValue {
     public double asDouble(double def)      { return def; }
     public boolean isDouble()               { return false; }
 
+    public byte[] asBytes(byte[] def)       { return def; }
+    public boolean isBytes()                { return false; }
+
     public boolean isMissing()              { return this == MissingValue.INSTANCE; }
     public boolean isObject()               { return false; }
     public boolean isArray()                { return false; }
@@ -62,4 +65,21 @@ public abstract class ReadContextValue {
     }
 
     public int size() { return 0; }
+
+    public boolean eq(ReadContextValue other) {
+        return this == other;
+    }
+
+    public boolean gt(ReadContextValue other){
+        return false;
+    };
+    public boolean lt(ReadContextValue other){
+        return false;
+    };
+    public boolean gte(ReadContextValue other){
+        return false;
+    };
+    public boolean lte(ReadContextValue other){
+        return false;
+    };
 }

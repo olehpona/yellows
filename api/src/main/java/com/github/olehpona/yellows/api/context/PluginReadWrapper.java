@@ -19,6 +19,9 @@ public interface PluginReadWrapper {
     double asDouble(double def);
     boolean isDouble();
 
+    byte[] asBytes(byte[] def);
+    boolean isBytes();
+
     boolean isMissing();
     boolean isObject();
     boolean isArray();
@@ -29,7 +32,15 @@ public interface PluginReadWrapper {
     PluginReadWrapper subtract(PluginReadWrapper other);
     PluginReadWrapper multiply(PluginReadWrapper other);
     PluginReadWrapper divide(PluginReadWrapper other);
+
+    PluginReadWrapper getIndex(int index);
     PluginReadWrapper resolvePath(String path);
+
+    boolean eq(PluginReadWrapper other);
+    boolean gt(PluginReadWrapper other);
+    boolean lt(PluginReadWrapper other);
+    boolean gte(PluginReadWrapper other);
+    boolean lte(PluginReadWrapper other);
 
     Iterable<String> keys();
     Iterable<PluginReadWrapper> values();

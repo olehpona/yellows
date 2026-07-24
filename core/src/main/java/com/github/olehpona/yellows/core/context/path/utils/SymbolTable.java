@@ -39,4 +39,8 @@ public class SymbolTable {
     public String getString(int id) {
         return idToString.get(id);
     }
+
+    public int size() {
+        return idToString.size();
+    }
 }

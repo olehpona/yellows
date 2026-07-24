@@ -7,3 +7,8 @@ com.github.olehpona.yellows.core.plugins.builtin.math.Add
 com.github.olehpona.yellows.core.plugins.builtin.math.Subtract
 com.github.olehpona.yellows.core.plugins.builtin.math.Multiply
 com.github.olehpona.yellows.core.plugins.builtin.math.Divide
+com.github.olehpona.yellows.core.plugins.builtin.logic.Eq
+com.github.olehpona.yellows.core.plugins.builtin.logic.Gt
+com.github.olehpona.yellows.core.plugins.builtin.logic.Gte
+com.github.olehpona.yellows.core.plugins.builtin.logic.Lt
+com.github.olehpona.yellows.core.plugins.builtin.logic.Lte

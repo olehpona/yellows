@@ -18,4 +18,44 @@ public class StringValue extends ReadContextValue {
             return NaNValue.INSTANCE;
         }
     }
+
+    @Override
+    public boolean eq(ReadContextValue o) {
+        if (o instanceof StringValue other) {
+            return this.value.equals(other.value);
+        }
+        return false;
+    }
+
+    @Override
+    public boolean gt(ReadContextValue o) {
+        if (o instanceof StringValue other) {
+            return this.value.compareTo(other.value) > 0;
+        }
+        return false;
+    }
+
+    @Override
+    public boolean gte(ReadContextValue o) {
+        if (o instanceof StringValue other) {
+            return this.value.compareTo(other.value) >= 0;
+        }
+        return false;
+    }
+
+    @Override
+    public boolean lt(ReadContextValue o) {
+        if (o instanceof StringValue other) {
+            return this.value.compareTo(other.value) < 0;
+        }
+        return false;
+    }
+
+    @Override
+    public boolean lte(ReadContextValue o) {
+        if (o instanceof StringValue other) {
+            return this.value.compareTo(other.value) <= 0;
+        }
+        return false;
+    }
 }
