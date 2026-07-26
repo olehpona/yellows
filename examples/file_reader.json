@@ -1,0 +1,38 @@
+{
+  "nodes": [
+    {
+      "name": "list-files",
+      "plugin": "overdriven.files.list_files",
+      "input": {
+        "path": "const.path"
+      },
+      "output": {
+        "out": "files"
+      },
+      "next": ["iterate-files"]
+    },
+    {
+      "name": "iterate-files",
+      "plugin": "overdriven.utils.for_loop",
+      "input": {
+        "in": "files"
+      },
+      "output": {
+        "value": "current_file"
+      },
+      "next": ["print-file"]
+    },
+    {
+      "name": "print-file",
+      "plugin": "builtin.print",
+      "input": {
+        "out": "current_file"
+      },
+      "output": {},
+      "next": []
+    }
+  ],
+  "constants": {
+    "path": "."
+  }
+}

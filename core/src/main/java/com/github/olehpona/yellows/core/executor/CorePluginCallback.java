@@ -66,14 +66,37 @@ class CorePluginCallback implements PluginCallback {
         }
 
         try {
-            var newCtx = executor.copyRunContext(ctx);
-            if (logger.isInfoEnabled()) {
-                logger.info("{} spawned context {}", ctx.getTrace(nodeId), newCtx.getContextId());
-            }
-            int[] nextNodes = newCtx.mergeOutput(nodeId, CorePluginWriteWrapper.unwrap(output), hints);
-            for (int nextNode: nextNodes) {
-                executor.spawnNode(newCtx, nextNode, phaser);
-            }
+            spawn(output, hints, phaser);
+        } catch (Throwable t) {
+            fail(t);
+        }
+    }
+
+    private void spawn(PluginWriteWrapper output, List<String> hints, Phaser phaser) {
+        var newCtx = executor.copyRunContext(ctx);
+        if (logger.isInfoEnabled()) {
+            logger.info("{} spawned context {}", ctx.getTrace(nodeId), newCtx.getContextId());
+        }
+        int[] nextNodes = newCtx.mergeOutput(nodeId, CorePluginWriteWrapper.unwrap(output), hints);
+        for (int nextNode: nextNodes) {
+            executor.spawnNode(newCtx, nextNode, phaser);
+        }
+    }
+
+    @Override
+    public void completeAndSpawnBlocking(PluginWriteWrapper output, List<String> hints) {
+        if (isFinished.get()) {
+            throw new IllegalStateException("Cannot spawn after completeAndReturn or fail!");
+        }
+
+        if (ctx.isKilled()) {
+            throw new IllegalStateException("RunContext is killed");
+        }
+
+        try {
+            Phaser phaser = new Phaser(1);
+            spawn(output, hints, phaser);
+            phaser.arriveAndAwaitAdvance();
         } catch (Throwable t) {
             fail(t);
         }

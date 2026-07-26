@@ -165,7 +165,6 @@ For more details [Plugins docs](api/README.md)
 
 ## What next
 * More test
-* External plugins collection for io operations
 
 ## Some boring implementation details
 Graph compilation is a process that can be divided into two key stages: 1—optimization; 2—validation

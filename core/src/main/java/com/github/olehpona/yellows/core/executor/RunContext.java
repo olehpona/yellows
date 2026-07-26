@@ -1,10 +1,10 @@
 package com.github.olehpona.yellows.core.executor;
 
+import com.github.olehpona.yellows.core.context.*;
+import com.github.olehpona.yellows.core.context.path.StringPath;
 import it.unimi.dsi.fastutil.ints.IntArrayFIFOQueue;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
-import com.github.olehpona.yellows.core.context.ReadContextValue;
-import com.github.olehpona.yellows.core.context.WriteContextValue;
 import com.github.olehpona.yellows.core.context.path.utils.SymbolTable;
 import com.github.olehpona.yellows.core.executor.exceptions.ExecutorException;
 import com.github.olehpona.yellows.core.executor.exceptions.ExecutorExceptionCode;
@@ -56,7 +56,7 @@ class RunContext {
             inDegree = inDegreeCopy;
             status = Arrays.copyOf(other.status, other.status.length);
         } finally {
-           lock.writeLock().unlock();
+            other.lock.writeLock().unlock();
         }
     }
 
@@ -90,7 +90,12 @@ class RunContext {
         }
 
         for (var inputPair: nodeData.get(globalIndex).input()) {
-            inputContext.putPath(inputPair.remote(),dict, root.resolvePath(inputPair.global(), dict));
+            var element = root.resolvePath(inputPair.global(), dict);
+            if (inputPair.remote().isRoot()) {
+                inputContext = new ScopedContext(element, inputContext);
+            } else {
+                inputContext.putPath(inputPair.remote(), dict, root.resolvePath(inputPair.global(), dict));
+            }
         }
 
         return inputContext;
@@ -134,7 +139,11 @@ class RunContext {
         lock.readLock().lock();
         try {
             for (var outputPair : data.output()) {
-                root.putPath(outputPair.global(),dict, ctx.resolvePath(outputPair.remote(), dict));
+                if (outputPair.remote().isRoot()) {
+                    root.putPath(outputPair.global(),dict, ctx);
+                } else {
+                    root.putPath(outputPair.global(),dict, ctx.resolvePath(outputPair.remote(), dict));
+                }
             }
 
             for (var it = subGraph.childIterator(nodeId); it.hasNext(); ) {

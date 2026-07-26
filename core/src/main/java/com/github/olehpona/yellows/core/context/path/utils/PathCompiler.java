@@ -5,6 +5,10 @@ import com.github.olehpona.yellows.core.context.path.StringPath;
 
 public class PathCompiler {
     public static IntPath compileGlobal(String dotted, SymbolTable dict) {
+        if (dotted.isEmpty()) {
+            return new IntPath(new int[0]);
+        }
+
         String[] parts = dotted.split("\\.");
         int[] segments = new int[parts.length];
 

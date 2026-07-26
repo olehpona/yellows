@@ -7,5 +7,6 @@ import java.util.List;
 public interface PluginCallback {
     void completeAndReturn(PluginWriteWrapper output, List<String> hints);
     void completeAndSpawn(PluginWriteWrapper output, List<String> hints);
+    void completeAndSpawnBlocking(PluginWriteWrapper output, List<String> hints);
     void fail(Throwable t);
 }

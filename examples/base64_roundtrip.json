@@ -1,0 +1,71 @@
+{
+  "nodes": [
+    {
+      "name": "read-secret",
+      "plugin": "overdriven.files.read_file_bytes",
+      "input": {
+        "path": "const.input_file"
+      },
+      "output": {
+        "out": "raw_bytes"
+      },
+      "next": ["encode-base64"]
+    },
+    {
+      "name": "encode-base64",
+      "plugin": "overdriven.base64.encode_bytes",
+      "input": {
+        "in": "raw_bytes"
+      },
+      "output": {
+        "out": "encoded_string"
+      },
+      "next": ["print-encoded"]
+    },
+    {
+      "name": "print-encoded",
+      "plugin": "builtin.print",
+      "input": {
+        "out": "encoded_string"
+      },
+      "output": {},
+      "next": ["decode-base64"]
+    },
+    {
+      "name": "decode-base64",
+      "plugin": "overdriven.base64.decode_bytes",
+      "input": {
+        "in": "encoded_string"
+      },
+      "output": {
+        "out": "decoded_bytes"
+      },
+      "next": ["write-decoded"]
+    },
+    {
+      "name": "write-decoded",
+      "plugin": "overdriven.files.write_file_bytes",
+      "input": {
+        "path": "const.output_file",
+        "data": "decoded_bytes"
+      },
+      "output": {},
+      "next": ["done"]
+    },
+    {
+      "name": "done",
+      "plugin": "builtin.print",
+      "input": {
+        "out": "const.done_msg"
+      },
+      "output": {},
+      "next": []
+    }
+  ],
+  "routines": {},
+  "constants": {
+    "input_file": "secret.txt",
+    "output_file": "decoded_secret.txt",
+    "done_msg": "Round trip complete!"
+  }
+}

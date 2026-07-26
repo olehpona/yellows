@@ -5,6 +5,7 @@ import com.github.olehpona.yellows.core.context.path.StringPath;
 import com.github.olehpona.yellows.core.context.path.utils.SymbolTable;
 import com.github.olehpona.yellows.api.context.PluginReadWrapper;
 
+import java.util.AbstractMap;
 import java.util.Iterator;
 
 public class CorePluginReadWrapper implements PluginReadWrapper {
@@ -47,9 +48,9 @@ public class CorePluginReadWrapper implements PluginReadWrapper {
     public boolean isDouble()               { return val.isDouble(); }
 
     @Override
-    public byte[] asBytes(byte[] def)       { return def; }
+    public byte[] asBytes(byte[] def)       { return val.asBytes(def); }
     @Override
-    public boolean isBytes()                { return false; }
+    public boolean isBytes()                { return val.isBytes(); }
 
     @Override
     public boolean isMissing()              { return val.isMissing(); }
@@ -113,8 +114,19 @@ public class CorePluginReadWrapper implements PluginReadWrapper {
         return val;
     }
 
-    public Iterable<String> keys() {
-        return val.getKeys(this.dict);
+    public Iterable<AbstractMap.SimpleImmutableEntry<String, PluginReadWrapper>> entries() {
+        return () -> new Iterator<>() {
+            private final Iterator<AbstractMap.SimpleImmutableEntry<String, ReadContextValue>> rawIt = val.getEntries(dict).iterator();
+
+            @Override
+            public boolean hasNext() { return rawIt.hasNext(); }
+
+            @Override
+            public AbstractMap.SimpleImmutableEntry<String, PluginReadWrapper> next() {
+                var entry = rawIt.next();
+                return new AbstractMap.SimpleImmutableEntry<>(entry.getKey(), new CorePluginReadWrapper(entry.getValue(), dict));
+            }
+        };
     }
 
     public Iterable<PluginReadWrapper> values() {

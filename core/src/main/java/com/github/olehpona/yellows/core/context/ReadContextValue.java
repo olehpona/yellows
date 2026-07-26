@@ -5,6 +5,7 @@ import com.github.olehpona.yellows.core.context.path.utils.SymbolTable;
 import com.github.olehpona.yellows.core.context.values.scalar.MissingValue;
 import com.github.olehpona.yellows.core.context.values.scalar.NaNValue;
 
+import java.util.AbstractMap;
 import java.util.List;
 
 public abstract class ReadContextValue {
@@ -56,7 +57,7 @@ public abstract class ReadContextValue {
         return NaNValue.INSTANCE;
     }
 
-    public Iterable<String> getKeys(SymbolTable dict) {
+    public Iterable<AbstractMap.SimpleImmutableEntry<String, ReadContextValue>> getEntries(SymbolTable dict) {
         return List.of();
     }
 

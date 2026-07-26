@@ -6,12 +6,16 @@ import java.util.Iterator;
 
 public class StringPath implements Iterable<StringPath.Segment> {
     private final Segment[] segments;
+    public static final StringPath ROOT = new StringPath(new Segment[0]);
 
     private StringPath(Segment[] segments) {
         this.segments = segments;
     }
 
     public static StringPath fromString(String path) {
+        if (path.isEmpty()) {
+            return ROOT;
+        }
         String[] parts = path.split("\\.");
         Segment[] segments = new Segment[parts.length];
 
@@ -87,5 +91,9 @@ public class StringPath implements Iterable<StringPath.Segment> {
         public int getIntKey(SymbolTable dict) {
             return dict.getInt(this.key);
         }
+    }
+
+    public boolean isRoot() {
+        return this == ROOT;
     }
 }

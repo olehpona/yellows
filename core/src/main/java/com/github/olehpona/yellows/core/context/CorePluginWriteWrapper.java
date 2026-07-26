@@ -70,7 +70,7 @@ public class CorePluginWriteWrapper extends AbstractWriteWrapper {
     }
 
     @Override
-    public void putIndex(int index, PluginWriteWrapper wrapper) {
+    public void putIndex(int index, PluginReadWrapper wrapper) {
         if (!(wrapper instanceof CorePluginReadWrapper other)) {
             throw new IllegalArgumentException("Untrusted wrapper");
         }
@@ -81,7 +81,7 @@ public class CorePluginWriteWrapper extends AbstractWriteWrapper {
     }
 
     @Override
-    public void putIndex(int index, PluginReadWrapper wrapper) {
+    public void putIndex(int index, PluginWriteWrapper wrapper) {
         if (!(wrapper instanceof CorePluginWriteWrapper other)) {
             throw new IllegalArgumentException("Untrusted wrapper");
         }

@@ -7,28 +7,26 @@ import com.github.olehpona.yellows.core.context.path.utils.SymbolTable;
 import com.github.olehpona.yellows.core.context.values.scalar.DeleteMarker;
 import com.github.olehpona.yellows.core.context.values.scalar.MissingValue;
 
-import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.function.Supplier;
 
 public class ArrayValue extends WriteContextValue {
-    private final ArrayList<ReadContextValue> items;
-    private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+    private static final int CHUNK_SHIFT = 5;
+    private static final int CHUNK_SIZE = 1 << CHUNK_SHIFT;
+    private static final int CHUNK_MASK = CHUNK_SIZE - 1;
+
+    private final AtomicReference<AtomicReferenceArray<AtomicReferenceArray<ReadContextValue>>> chunksRef;
 
     public ArrayValue(Supplier<WriteContextValue> objFact, Supplier<WriteContextValue> arrFact) {
         super(objFact, arrFact);
-        this.items = new ArrayList<>();
-    }
-
-    public ArrayValue(Supplier<WriteContextValue> objFact, Supplier<WriteContextValue> arrFact, ArrayList<ReadContextValue> items) {
-        super(objFact, arrFact);
-        this.items = items;
+        this.chunksRef = new AtomicReference<>(new AtomicReferenceArray<>(1));
     }
 
     @Override
     public String asString() {
-        return "Array size=" + items.size();
+        return "Array size=" + size();
     }
 
     @Override
@@ -39,119 +37,185 @@ public class ArrayValue extends WriteContextValue {
     @Override
     public ReadContextValue getChild(PathSegment token, SymbolTable dict) {
         if (!token.isIndex()) return MissingValue.INSTANCE;
+        int idx = token.getIndex();
+        if (idx < 0) return MissingValue.INSTANCE;
 
-        lock.readLock().lock();
-        try {
-            int index = token.getIndex();
-            if (index >= 0 && index < items.size()) {
-                return items.get(index);
+        int chunkIdx = idx >> CHUNK_SHIFT;
+        int localIdx = idx & CHUNK_MASK;
+
+        AtomicReferenceArray<AtomicReferenceArray<ReadContextValue>> outer = chunksRef.get();
+        if (chunkIdx < outer.length()) {
+            AtomicReferenceArray<ReadContextValue> chunk = outer.get(chunkIdx);
+            if (chunk != null) {
+                ReadContextValue val = chunk.get(localIdx);
+                return val != null ? val : MissingValue.INSTANCE;
             }
-            return MissingValue.INSTANCE;
-        } finally {
-            lock.readLock().unlock();
         }
+        return MissingValue.INSTANCE;
     }
 
     @Override
     protected void putChild(PathSegment segment, SymbolTable dict, ReadContextValue value) {
-        if (!segment.isIndex()) {
-            throw new IllegalArgumentException("Cannot write to an array using an object key.");
-        }
+        if (!segment.isIndex()) throw new IllegalArgumentException("Cannot write to an array using an object key.");
+        int idx = segment.getIndex();
+        if (idx < 0) return;
 
-        lock.writeLock().lock();
-        try {
-            int idx = segment.getIndex();
-            if (value == DeleteMarker.INSTANCE) {
-                items.remove(idx);
-                return;
+        int chunkIdx = idx >> CHUNK_SHIFT;
+        int localIdx = idx & CHUNK_MASK;
+        ReadContextValue valToSet = (value == DeleteMarker.INSTANCE) ? MissingValue.INSTANCE : value;
+
+        while (true) {
+            AtomicReferenceArray<AtomicReferenceArray<ReadContextValue>> outer = chunksRef.get();
+
+            if (chunkIdx >= outer.length()) {
+                int newCap = Math.max(outer.length() * 2, chunkIdx + 1);
+                AtomicReferenceArray<AtomicReferenceArray<ReadContextValue>> newOuter = new AtomicReferenceArray<>(newCap);
+
+                for (int i = 0; i < outer.length(); i++) {
+                    newOuter.set(i, outer.get(i));
+                }
+
+                chunksRef.compareAndSet(outer, newOuter);
+                continue;
             }
-            while (items.size() <= idx) {
-                items.add(MissingValue.INSTANCE);
+
+            AtomicReferenceArray<ReadContextValue> chunk = outer.get(chunkIdx);
+            if (chunk == null) {
+                AtomicReferenceArray<ReadContextValue> newChunk = new AtomicReferenceArray<>(CHUNK_SIZE);
+                if (!outer.compareAndSet(chunkIdx, null, newChunk)) {
+                    continue;
+                }
+                chunk = newChunk;
             }
-            items.set(idx, value);
-        } finally {
-            lock.writeLock().unlock();
+
+            chunk.set(localIdx, valToSet);
+            return;
         }
     }
 
     @Override
     protected WriteContextValue computeIfAbsentChild(PathSegment segment, SymbolTable dict, Supplier<WriteContextValue> childFactory) {
-        int index = segment.getIndex();
-        lock.readLock().lock();
-        try {
-            ReadContextValue existing = items.size() > index ? items.get(index) : MissingValue.INSTANCE;
-            if (existing instanceof WriteContextValue writeNode) {
-                return writeNode;
-            }
-        } finally {
-            lock.readLock().unlock();
-        }
+        int idx = segment.getIndex();
+        if (idx < 0) throw new IllegalArgumentException("Invalid key");
 
-        lock.writeLock().lock();
-        try {
-            ReadContextValue existing = items.size() > index ? items.get(index) : MissingValue.INSTANCE;
+        int chunkIdx = idx >> CHUNK_SHIFT;
+        int localIdx = idx & CHUNK_MASK;
+
+        while (true) {
+            AtomicReferenceArray<AtomicReferenceArray<ReadContextValue>> outer = chunksRef.get();
+
+            if (chunkIdx >= outer.length()) {
+                int newCap = Math.max(outer.length() * 2, chunkIdx + 1);
+                AtomicReferenceArray<AtomicReferenceArray<ReadContextValue>> newOuter = new AtomicReferenceArray<>(newCap);
+                for (int i = 0; i < outer.length(); i++) {
+                    newOuter.set(i, outer.get(i));
+                }
+                chunksRef.compareAndSet(outer, newOuter);
+                continue;
+            }
+
+            AtomicReferenceArray<ReadContextValue> chunk = outer.get(chunkIdx);
+            if (chunk == null) {
+                AtomicReferenceArray<ReadContextValue> newChunk = new AtomicReferenceArray<>(CHUNK_SIZE);
+                if (!outer.compareAndSet(chunkIdx, null, newChunk)) {
+                    continue;
+                }
+                chunk = newChunk;
+            }
+
+            ReadContextValue existing = chunk.get(localIdx);
             if (existing instanceof WriteContextValue writeNode) {
                 return writeNode;
             }
 
             WriteContextValue newChild = childFactory.get();
-            while (items.size() <= index) {
-                items.add(MissingValue.INSTANCE);
+            if (chunk.compareAndSet(localIdx, existing, newChild)) {
+                return newChild;
             }
-            items.set(index, newChild);
-            return newChild;
-
-        } finally {
-            lock.writeLock().unlock();
         }
     }
 
     @Override
     public WriteContextValue deepCopy() {
-        ArrayList<ReadContextValue> newItems = new ArrayList<>(items.size());
-        lock.readLock().lock();
-        try {
-            for (ReadContextValue item : items) {
-                newItems.add(item.deepCopy());
-            }
-        } finally {
-            lock.readLock().unlock();
+        ArrayValue copy = new ArrayValue(objectFactory, arrayFactory);
+        AtomicReferenceArray<AtomicReferenceArray<ReadContextValue>> outer = chunksRef.get();
+
+        int maxChunkIdx = -1;
+        for (int i = 0; i < outer.length(); i++) {
+            if (outer.get(i) != null) maxChunkIdx = i;
         }
-        return new ArrayValue(objectFactory, arrayFactory, newItems);
+
+        if (maxChunkIdx == -1) return copy;
+
+        AtomicReferenceArray<AtomicReferenceArray<ReadContextValue>> newOuter = new AtomicReferenceArray<>(maxChunkIdx + 1);
+        copy.chunksRef.set(newOuter);
+
+        for (int chunkIdx = 0; chunkIdx <= maxChunkIdx; chunkIdx++) {
+            AtomicReferenceArray<ReadContextValue> chunk = outer.get(chunkIdx);
+            if (chunk != null) {
+                AtomicReferenceArray<ReadContextValue> newChunk = new AtomicReferenceArray<>(CHUNK_SIZE);
+                for (int localIdx = 0; localIdx < CHUNK_SIZE; localIdx++) {
+                    ReadContextValue val = chunk.get(localIdx);
+                    if (val != null && val != MissingValue.INSTANCE) {
+                        newChunk.set(localIdx, val.deepCopy());
+                    }
+                }
+                newOuter.set(chunkIdx, newChunk);
+            }
+        }
+        return copy;
     }
 
     @Override
     public Iterable<ReadContextValue> getValues() {
-        ArrayList<ReadContextValue> newItems = new ArrayList<>(items.size());
-        lock.readLock().lock();
-        try {
-            newItems.addAll(items);
-        } finally {
-            lock.readLock().unlock();
-        }
+        AtomicReferenceArray<AtomicReferenceArray<ReadContextValue>> outer = chunksRef.get();
+        int length = size();
 
         return () -> new Iterator<>() {
             private int index = 0;
 
             @Override
             public boolean hasNext() {
-                return index < newItems.size();
+                return index < length;
             }
 
             @Override
             public ReadContextValue next() {
-                return newItems.get(index++);
+                int currentIdx = index++;
+                int chunkIdx = currentIdx >> CHUNK_SHIFT;
+                int localIdx = currentIdx & CHUNK_MASK;
+
+                // Швидке безпечне читання
+                if (chunkIdx < outer.length()) {
+                    AtomicReferenceArray<ReadContextValue> chunk = outer.get(chunkIdx);
+                    if (chunk != null) {
+                        ReadContextValue val = chunk.get(localIdx);
+                        if (val != null) {
+                            return val;
+                        }
+                    }
+                }
+                return MissingValue.INSTANCE;
             }
         };
     }
 
     @Override
     public int size() {
-        lock.readLock().lock();
-        try {
-            return items.size();
-        } finally {
-            lock.readLock().unlock();
+        AtomicReferenceArray<AtomicReferenceArray<ReadContextValue>> outer = chunksRef.get();
+
+        for (int chunkIdx = outer.length() - 1; chunkIdx >= 0; chunkIdx--) {
+            AtomicReferenceArray<ReadContextValue> chunk = outer.get(chunkIdx);
+
+            if (chunk != null) {
+                for (int localIdx = CHUNK_SIZE - 1; localIdx >= 0; localIdx--) {
+                    ReadContextValue val = chunk.get(localIdx);
+                    if (val != null && val != MissingValue.INSTANCE) {
+                        return (chunkIdx << CHUNK_SHIFT) + localIdx + 1;
+                    }
+                }
+            }
         }
+        return 0;
     }
 }

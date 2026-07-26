@@ -1,5 +1,7 @@
 package com.github.olehpona.yellows.api.context;
 
+import java.util.AbstractMap;
+
 public interface PluginReadWrapper {
     String asString();
     boolean isString();
@@ -42,7 +44,7 @@ public interface PluginReadWrapper {
     boolean gte(PluginReadWrapper other);
     boolean lte(PluginReadWrapper other);
 
-    Iterable<String> keys();
+    Iterable<AbstractMap.SimpleImmutableEntry<String, PluginReadWrapper>> entries();
     Iterable<PluginReadWrapper> values();
     int size();
 }

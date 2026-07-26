@@ -6,29 +6,21 @@ import com.github.olehpona.yellows.core.context.path.PathSegment;
 import com.github.olehpona.yellows.core.context.path.utils.SymbolTable;
 import com.github.olehpona.yellows.core.context.values.scalar.DeleteMarker;
 import com.github.olehpona.yellows.core.context.values.scalar.MissingValue;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.function.Supplier;
 
 public class StringObject extends WriteContextValue {
-    private final Map<String, ReadContextValue> fields;
-    private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+    private final ConcurrentMap<String, ReadContextValue> fields;
 
-    public StringObject(Map<String, ReadContextValue> fields, Supplier<WriteContextValue> objFact, Supplier<WriteContextValue> arrFact) { super(objFact, arrFact); this.fields = fields; }
-    public StringObject(Supplier<WriteContextValue> objFact, Supplier<WriteContextValue> arrFact) {super(objFact, arrFact); this.fields = new HashMap<>(); }
+    private StringObject(ConcurrentMap<String, ReadContextValue> fields, Supplier<WriteContextValue> objFact, Supplier<WriteContextValue> arrFact) { super(objFact, arrFact); this.fields = fields; }
+    public StringObject(Supplier<WriteContextValue> objFact, Supplier<WriteContextValue> arrFact) {super(objFact, arrFact); this.fields = new ConcurrentHashMap<>(); }
 
     @Override
     public ReadContextValue getChild(PathSegment segment, SymbolTable dict) {
         if (segment.isIndex()) return MissingValue.INSTANCE;
-        lock.readLock().lock();
-        try {
-            return fields.getOrDefault(segment.getStringKey(dict), MissingValue.INSTANCE);
-        } finally {
-            lock.readLock().unlock();
-        }
+        return fields.getOrDefault(segment.getStringKey(dict), MissingValue.INSTANCE);
     }
 
     @Override
@@ -38,54 +30,25 @@ public class StringObject extends WriteContextValue {
             fields.remove(key);
             return;
         }
-        lock.writeLock().lock();
-        try {
-            fields.put(key, value);
-        } finally {
-            lock.writeLock().unlock();
-        }
+
+        fields.put(key, value);
     }
 
     @Override
     protected WriteContextValue computeIfAbsentChild(PathSegment segment, SymbolTable dict, Supplier<WriteContextValue> childFactory) {
         String key = segment.getStringKey(dict);
-        lock.readLock().lock();
-        try {
-            ReadContextValue existing = fields.get(key);
+
+        return (WriteContextValue) fields.compute(key, (k, existing) -> {
             if (existing instanceof WriteContextValue writeNode) {
                 return writeNode;
             }
-        } finally {
-            lock.readLock().unlock();
-        }
-
-        lock.writeLock().lock();
-        try {
-            ReadContextValue existing = fields.get(key);
-            if (existing instanceof WriteContextValue writeNode) {
-                return writeNode;
-            }
-
-            WriteContextValue newChild = childFactory.get();
-            fields.put(key, newChild);
-            return newChild;
-
-        } finally {
-            lock.writeLock().unlock();
-        }
+            return childFactory.get();
+        });
     }
 
     @Override
     public WriteContextValue deepCopy() {
-        Map<String, ReadContextValue> newFields = new HashMap<>(fields.size());
-        lock.readLock().lock();
-        try {
-            for (Map.Entry<String, ReadContextValue> entry : fields.entrySet()) {
-                newFields.put(entry.getKey(), entry.getValue().deepCopy());
-            }
-        }  finally {
-            lock.readLock().unlock();
-        }
+        ConcurrentMap<String, ReadContextValue> newFields = new ConcurrentHashMap<>(fields);
 
         return new StringObject(newFields, objectFactory, arrayFactory);
     }
@@ -101,36 +64,28 @@ public class StringObject extends WriteContextValue {
     }
 
     @Override
-    public Iterable<String> getKeys(SymbolTable dict) {
-        ArrayList<String> keys;
-        lock.readLock().lock();
-        try {
-            keys = new ArrayList<>(fields.keySet());
-        } finally {
-            lock.readLock().unlock();
-        }
-        return keys;
+    public Iterable<AbstractMap.SimpleImmutableEntry<String, ReadContextValue>> getEntries(SymbolTable dict) {
+        return () -> new Iterator<>() {
+            private final Iterator<Map.Entry<String, ReadContextValue>> it = fields.entrySet().iterator();
+
+            @Override
+            public boolean hasNext() { return it.hasNext(); }
+
+            @Override
+            public AbstractMap.SimpleImmutableEntry<String, ReadContextValue> next() {
+                var entry = it.next();
+                return new AbstractMap.SimpleImmutableEntry<>(entry.getKey(), entry.getValue());
+            }
+        };
     }
 
     @Override
     public Iterable<ReadContextValue> getValues() {
-        ArrayList<ReadContextValue> values;
-        lock.readLock().lock();
-        try {
-            values = new ArrayList<>(fields.values());
-        } finally {
-            lock.readLock().unlock();
-        }
-        return values;
+        return fields.values();
     }
 
     @Override
     public int size() {
-        lock.readLock().lock();
-        try {
-            return fields.size();
-        } finally {
-            lock.readLock().unlock();
-        }
+        return fields.size();
     }
 }

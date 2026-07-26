@@ -1,0 +1,65 @@
+{
+  "nodes": [
+    {
+      "name": "fetch-users",
+      "plugin": "overdriven.http.http_request",
+      "input": {
+        "method": "const.method",
+        "url": "const.url"
+      },
+      "output": {
+        "body": "users_json.body"
+      },
+      "next": ["parse-users"]
+    },
+    {
+      "name": "parse-users",
+      "plugin": "overdriven.json.ctx_from_json_string",
+      "input": {
+        "in": "users_json.body"
+      },
+      "output": {
+        "out": "users"
+      },
+      "next": ["iterate-users"]
+    },
+    {
+      "name": "iterate-users",
+      "plugin": "overdriven.utils.for_loop",
+      "input": {
+        "in": "users"
+      },
+      "output": {
+        "value": "user"
+      },
+      "next": ["extract-name"]
+    },
+    {
+      "name": "extract-name",
+      "plugin": "builtin.format",
+      "input": {
+        "format_string": "const.format",
+        "values.[0]": "user.username"
+      },
+      "output": {
+        "result": "user_msg"
+      },
+      "next": ["print-user"]
+    },
+    {
+      "name": "print-user",
+      "plugin": "builtin.print",
+      "input": {
+        "out": "user_msg"
+      },
+      "output": {},
+      "next": []
+    }
+  ],
+  "routines": {},
+  "constants": {
+    "format": "User: %s",
+    "method": "GET",
+    "url": "https://jsonplaceholder.typicode.com/users"
+  }
+}

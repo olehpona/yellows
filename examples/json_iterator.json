@@ -1,0 +1,54 @@
+{
+  "nodes": [
+    {
+      "name": "create-object",
+      "plugin": "overdriven.json.ctx_from_json_string",
+      "input": {
+        "in": "const.json"
+      },
+      "output": {
+        "out": "data"
+      },
+      "next": ["iterate-object"]
+    },
+    {
+      "name": "iterate-object",
+      "plugin": "overdriven.utils.for_loop",
+      "input": {
+        "in": "data"
+      },
+      "output": {
+        "key": "key",
+        "value": "value"
+      },
+      "next": ["print-entry"]
+    },
+    {
+      "name": "print-entry",
+      "plugin": "builtin.format",
+      "input": {
+        "format_string": "const.format",
+        "values.[0]": "key",
+        "values.[1]": "value"
+      },
+      "output": {
+        "result": "entry"
+      },
+      "next": ["print"]
+    },
+    {
+      "name": "print",
+      "plugin": "builtin.print",
+      "input": {
+        "out": "entry"
+      },
+      "output": {},
+      "next": []
+    }
+  ],
+  "routines": {},
+  "constants": {
+    "format": "%s: %s",
+    "json": "{\"name\":\"Yellows\",\"version\":\"1.0\",\"type\":\"engine\"}"
+  }
+}

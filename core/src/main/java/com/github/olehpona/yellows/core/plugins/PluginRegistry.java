@@ -50,6 +50,7 @@ public class PluginRegistry {
 
         try (Stream<Path> files = Files.list(dirPath)) {
             files.filter(p -> p.toString().endsWith(".jar")).forEach(path -> {
+                logger.info("Loading external plugins from {}", path);
                 try {
                     URL[] urls = new URL[]{path.toUri().toURL()};
                     URLClassLoader loader = new URLClassLoader(urls, ClassLoader.getSystemClassLoader());
@@ -79,14 +80,14 @@ public class PluginRegistry {
             Plugin meta = clazz.getAnnotation(Plugin.class);
 
             if (descriptors.containsKey(meta.id())) {
-                logger.warn("Plugin {} has already been registered", meta.id());
+                logger.error("Plugin {} has already been registered", meta.id());
                 throw new PluginRegistryException(PluginRegistryExceptionCode.ERR_ID_ALREADY_REGISTERED,
                         String.format("Plugin with id %s provided by %s already registered by %s",
                                 meta.id(), pluginPath, descriptors.get(meta.id()).source()));
             }
 
             Constructor<?> ctor = clazz.getConstructor();
-
+            logger.info("Plugin {} has been registered", meta.id());
             descriptors.put(meta.id(), new PluginDescriptor(clazz, ctor, meta.scope(), loader, pluginPath));
         } catch (NoSuchMethodException e) {
             throw new PluginRegistryException(PluginRegistryExceptionCode.ERR_CONSTRUCTOR_NOT_FOUND,

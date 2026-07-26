@@ -1,0 +1,41 @@
+{
+  "nodes": [
+    {
+      "name": "fetch-api",
+      "plugin": "overdriven.http.http_request",
+      "input": {
+        "method": "const.method",
+        "url": "const.url"
+      },
+      "output": {
+        "body": "response.body"
+      },
+      "next": ["parse-json"]
+    },
+    {
+      "name": "parse-json",
+      "plugin": "overdriven.json.ctx_from_json_string",
+      "input": {
+        "in": "response.body"
+      },
+      "output": {
+        "out": "data"
+      },
+      "next": ["print-result"]
+    },
+    {
+      "name": "print-result",
+      "plugin": "builtin.print",
+      "input": {
+        "out": "data.title"
+      },
+      "output": {},
+      "next": []
+    }
+  ],
+  "routines": {},
+  "constants": {
+    "method": "GET",
+    "url": "https://jsonplaceholder.typicode.com/posts/1"
+  }
+}

@@ -288,4 +288,68 @@ public class GraphBuilderTest {
 
         assertThat(exception.getExceptionCode()).isEqualTo(GraphExceptionCode.ERR_CONTEXT_COLLISION);
     }
+
+    @Test
+    void testRootContextWriteWriteConflict() {
+        // Один вузол перезаписує ВЕСЬ контекст (""), інший - перезаписує конкретний шлях ("a.b")
+        // Це жорсткий конфлікт ієрархії, бо "" є предком для будь-чого.
+        Node start = node("start").pointsTo("a", "b").build();
+        Node a = node("a").writes("").pointsTo("end").build();
+        Node b = node("b").writes("a.b").pointsTo("end").build();
+        Node end = node("end").build();
+
+        GraphException exception = assertThrows(GraphException.class, () ->
+                GraphBuilder.buildGraph(List.of(start, a, b, end), Map.of()));
+
+        assertThat(exception.getExceptionCode()).isEqualTo(GraphExceptionCode.ERR_CONTEXT_COLLISION);
+    }
+
+    @Test
+    void testRootContextReadWriteConflict() {
+        Node start = node("start").pointsTo("a", "b").build();
+        Node a = node("a").reads("").pointsTo("end").build();
+        Node b = node("b").writes("a.b").pointsTo("end").build();
+        Node end = node("end").build();
+
+        GraphException exception = assertThrows(GraphException.class, () ->
+                GraphBuilder.buildGraph(List.of(start, a, b, end), Map.of()));
+
+        assertThat(exception.getExceptionCode()).isEqualTo(GraphExceptionCode.ERR_CONTEXT_COLLISION);
+    }
+
+    @Test
+    void testRootContextWriteReadConflict() {
+        Node start = node("start").pointsTo("a", "b").build();
+        Node a = node("a").writes("").pointsTo("end").build();
+        Node b = node("b").reads("x.y").pointsTo("end").build();
+        Node end = node("end").build();
+
+        GraphException exception = assertThrows(GraphException.class, () ->
+                GraphBuilder.buildGraph(List.of(start, a, b, end), Map.of()));
+
+        assertThat(exception.getExceptionCode()).isEqualTo(GraphExceptionCode.ERR_CONTEXT_COLLISION);
+    }
+
+    @Test
+    void testRootContextExactKeyConflict() {
+        Node start = node("start").pointsTo("a", "b").build();
+        Node a = node("a").writes("").pointsTo("end").build();
+        Node b = node("b").writes("").pointsTo("end").build();
+        Node end = node("end").build();
+
+        GraphException exception = assertThrows(GraphException.class, () ->
+                GraphBuilder.buildGraph(List.of(start, a, b, end), Map.of()));
+
+        assertThat(exception.getExceptionCode()).isEqualTo(GraphExceptionCode.ERR_CONTEXT_COLLISION);
+    }
+
+    @Test
+    void testRootContextReadReadSafe() {
+        Node start = node("start").pointsTo("a", "b").build();
+        Node a = node("a").reads("").pointsTo("end").build();
+        Node b = node("b").reads("x.y").pointsTo("end").build();
+        Node end = node("end").build();
+
+        assertDoesNotThrow(() -> GraphBuilder.buildGraph(List.of(start, a, b, end), Map.of()));
+    }
 }
