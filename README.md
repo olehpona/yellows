@@ -23,6 +23,7 @@ Yellows is a pipeline engine powered by a directed acyclic graph ( DAG ). Built 
 * **Core** Engine components
 * **Api** Plugin api
 * **Benchmarks**
+* **Overdriven** Plugin collection
 
 ## Benchmarks
 Test device: MacBook Air M4 (10-core CPU, 24GB RAM), macOS 26.5.2  
@@ -45,21 +46,6 @@ Note: Each graph builder benchmark created graph 10 layer, 1000 nodes per layer 
 |:--------------------------------------------|:------|:------|:----------------|:------|
 | GraphBuilderBenchmark.testWithValidation    | 1,460 | s/op  | 80359552,000    | B/op  |
 | GraphBuilderBenchmark.testWithoutValidation | 0,065 | s/op  | 69965156,000    | B/op  |
-
-## Build and run
-### Build
-To build cli run
-```shell
-./gradlew :cli:shadowJar
-```
-### Run
-Run downloaded or built jar
-```shell
-java -jar cli.jar your_path_to_config.json
-```
-Note:
-* In the same dir must be created plugin directory for external plugins
-* -s / --skipValidation flag can be used to disable race condition validation
 
 ## Usage
 To start using you only need run config in JSON format. For now, it looks like this
