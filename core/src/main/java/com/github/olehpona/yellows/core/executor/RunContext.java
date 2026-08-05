@@ -227,7 +227,7 @@ class RunContext {
         for (int i = 0; i < status.length; i++) {
             int globalId = getSymbolId(i);
             String nodeName = nodeDict.getString(globalId);
-            result[i] =  new ObservabilityReport(nodeName, status[globalId]);
+            result[i] =  new ObservabilityReport(nodeName, status[i]);
         }
 
         return result;

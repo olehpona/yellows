@@ -16,10 +16,7 @@ import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.ServiceConfigurationError;
-import java.util.ServiceLoader;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 
@@ -42,7 +39,63 @@ public class PluginRegistry {
                     ));
         }
         loadExternalPlugins(externalPluginPath);
+    }
 
+    private static class PluginLoader extends URLClassLoader {
+
+        private final String apiPackagePrefix;
+        private final ClassLoader javaPlatformLoader;
+
+        public PluginLoader(URL[] urls, ClassLoader parent, String apiPackagePrefix) {
+            super(urls, parent);
+            this.apiPackagePrefix = apiPackagePrefix;
+
+            this.javaPlatformLoader = ClassLoader.getPlatformClassLoader();
+        }
+
+        @Override
+        protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+            synchronized (getClassLoadingLock(name)) {
+                Class<?> c = findLoadedClass(name);
+                if (c != null) return c;
+
+                try {
+                    c = javaPlatformLoader.loadClass(name);
+                    if (c != null) return c;
+                } catch (ClassNotFoundException ignored) {}
+
+                if (name.startsWith(apiPackagePrefix)) {
+                    return getParent().loadClass(name);
+                }
+
+                c = findClass(name);
+
+                if (resolve) {
+                    resolveClass(c);
+                }
+                return c;
+            }
+        }
+
+        @Override
+        public URL getResource(String name) {
+            URL url = findResource(name);
+            if (url != null) {
+                return url;
+            }
+
+            if (javaPlatformLoader != null) {
+                url = javaPlatformLoader.getResource(name);
+                if (url != null) return url;
+            }
+
+            return null;
+        }
+
+        @Override
+        public Enumeration<URL> getResources(String name) throws IOException {
+            return findResources(name);
+        }
     }
 
     private void loadExternalPlugins(String dir) {
@@ -53,7 +106,7 @@ public class PluginRegistry {
                 logger.info("Loading external plugins from {}", path);
                 try {
                     URL[] urls = new URL[]{path.toUri().toURL()};
-                    URLClassLoader loader = new URLClassLoader(urls, ClassLoader.getSystemClassLoader());
+                    URLClassLoader loader = new PluginLoader(urls, ClassLoader.getSystemClassLoader(), "com.github.olehpona.yellows.api");
                     ServiceLoader<PluginNode> plugins = ServiceLoader.load(PluginNode.class, loader);
                     plugins.stream().filter(p -> p.type().getClassLoader() == loader).forEach((pluginNode -> loadClass(loader, pluginNode.type(), path)));
                 } catch (ServiceConfigurationError e) {
