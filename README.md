@@ -44,7 +44,7 @@ Note: Each graph builder benchmark created graph 10 layer, 1000 nodes per layer 
 
 | Benchmark                                   | Score | Units | alloc rate norm | Units |
 |:--------------------------------------------|:------|:------|:----------------|:------|
-| GraphBuilderBenchmark.testWithValidation    | 1,460 | s/op  | 80359552,000    | B/op  |
+| GraphBuilderBenchmark.testWithValidation    | 0,827 | s/op  | 76729664,000    | B/op  |
 | GraphBuilderBenchmark.testWithoutValidation | 0,065 | s/op  | 69965156,000    | B/op  |
 
 ## Usage
