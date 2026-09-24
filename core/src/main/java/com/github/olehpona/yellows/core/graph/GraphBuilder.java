@@ -65,13 +65,13 @@ public class GraphBuilder {
                     }
 
                     futures.add(CompletableFuture.runAsync(() ->
-                            GraphValidator.validateKeyUsage(subGraph, nodeData, rootCtx), executor));
+                            GraphValidator.validateKeyUsage(subGraph, nodeData, rootCtx, dict.size()), executor));
                 }
 
                 for (RoutineData meta : routinesData) {
                     int routineRootCtx = meta.nodeNames().register(ROOT_AUTHOR);
                     futures.add(CompletableFuture.runAsync(() ->
-                            GraphValidator.validateKeyUsage(meta.subGraph(), nodeData, routineRootCtx), executor));
+                            GraphValidator.validateKeyUsage(meta.subGraph(), nodeData, routineRootCtx, dict.size()), executor));
                 }
 
                 try {

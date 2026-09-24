@@ -4,6 +4,7 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import com.github.olehpona.yellows.core.context.path.IntPath;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 
 class BranchContext {
     TrieNode writes;
@@ -71,7 +72,8 @@ class BranchContext {
                 current.hasReadDeeper = current.hasReadDeeper || source.hasReadDeeper;
             }
 
-            for (Int2ObjectMap.Entry<TrieNode> entry : source.children.entrySet()) {
+            for (Iterator<Int2ObjectMap.Entry<TrieNode>> it = source.children.entrySet(); it.hasNext(); ) {
+                Int2ObjectMap.Entry<TrieNode> entry = it.next();
                 int key = entry.getIntKey();
                 TrieNode sourceChild = entry.getValue();
                 TrieNode currentChild = current.children.get(key);
@@ -85,7 +87,8 @@ class BranchContext {
                         currentChild = new TrieNode(currentChild, this.contextId);
                         current.children.put(key, currentChild);
                     }
-                    merge(currentChild, sourceChild);
+                    stack.add(currentChild);
+                    stack.add(sourceChild);
                 }
             }
         }

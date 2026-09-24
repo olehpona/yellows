@@ -1,7 +1,5 @@
 package com.github.olehpona.yellows.core.graph.internal;
 
-import com.github.olehpona.yellows.core.graph.NodeData;
-import com.github.olehpona.yellows.core.graph.RoutineData;
 import com.github.olehpona.yellows.core.graph.SubGraph;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;

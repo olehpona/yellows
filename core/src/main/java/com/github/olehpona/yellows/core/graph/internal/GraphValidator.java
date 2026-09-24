@@ -15,7 +15,8 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class GraphValidator {
-    public static void validateKeyUsage(SubGraph subGraph, List<NodeData> nodeData, int rootCtxId) {
+    public static void validateKeyUsage(SubGraph subGraph, List<NodeData> nodeData, int rootCtxId, int totalKeysCount) {
+        ChildrenContainerCommonKeySet.init(totalKeysCount);
         int[] inDegreeCopy = Arrays.copyOf(subGraph.inDegree(), subGraph.inDegree().length);
         Int2ObjectOpenHashMap<BranchContext> states = new Int2ObjectOpenHashMap<>();
         AtomicInteger lastContextId = new AtomicInteger();
@@ -92,7 +93,8 @@ public class GraphValidator {
                 return;
             }
 
-            for (Int2ObjectMap.Entry<TrieNode> entry : updates.children.entrySet()) {
+            for (Iterator<Int2ObjectMap.Entry<TrieNode>> it = updates.children.entrySet(); it.hasNext(); ) {
+                Int2ObjectMap.Entry<TrieNode> entry = it.next();
                 TrieNode currentNode = current.children.get(entry.getIntKey());
                 if (currentNode != null) {
                     stack.add(currentNode);

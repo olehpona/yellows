@@ -36,6 +36,12 @@ public class Main implements Callable<Integer> {
     @Option(names = {"-c", "--config"}, description = "Path to config file")
     private File blueprintFile;
 
+    @Option(names = {"-g", "--graph"}, description = "Built graph file. Will be overridden with config. Will omit graph compiling and validation")
+    private File graphFile;
+
+    @Option(names = {"-b", "--built"}, description = "Optional file for storing built graph. Can be ised to omit graph compiling and validation.")
+    private File builtGraphFile;
+
     @Option(names = {"-s", "--skipValidation"}, description = "Skip validation")
     private boolean skipValidation;
 
@@ -63,17 +69,26 @@ public class Main implements Callable<Integer> {
         ObjectMapper mapper = builder.build();
 
         Graph graph;
+        JsonNode rawConstants;
         ReadContextValue cnst;
-
-
 
         if (blueprintFile != null) {
             PipelineBlueprint blueprint = mapper.readValue(blueprintFile, new TypeReference<>() {
             });
             graph = GraphBuilder.buildGraph(blueprint.nodes(), blueprint.routines(), 5, skipValidation);
+            rawConstants = blueprint.constants();
             cnst = buildConst(blueprint.constants(), graph.dict());
+        } else if (graphFile != null) {
+            BuiltGraph builtGraph = mapper.readValue(graphFile, new TypeReference<>() {});
+            graph = builtGraph.graph;
+            rawConstants = builtGraph.constants();
+            cnst = buildConst(builtGraph.constants(), graph.dict());
         } else {
             throw new IllegalArgumentException("At least config or graph must be defined");
+        }
+
+        if (builtGraphFile != null) {
+            mapper.writeValue(builtGraphFile, new BuiltGraph(graph, rawConstants));
         }
 
         Executor executor = new Executor(reg, graph.dict(), graph.nodes(), graph.routineData());
